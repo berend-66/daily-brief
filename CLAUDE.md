@@ -4,7 +4,7 @@
 
 Someone pointed you at this repo because they want their own Daily brief: one scheduled task that triages their inboxes and calendar every morning into a pinned page with a living background. Set it up in **their** Claude account, end to end, so that all they do is answer a few questions and add the page to their phone.
 
-It needs the Claude app (web, desktop or mobile) with **artifacts** and **scheduled tasks**, plus the **Gmail** and/or **Microsoft 365** connectors. Claude Code on its own can't publish the page; if you lack the Artifact or scheduling tools, say so and stop.
+It needs the Claude app with **artifacts** and the **Gmail** and/or **Microsoft 365** connectors. Creating the morning run also needs **scheduled tasks**: in Cowork, or in a chat where chat and Cowork are one experience. If you have the Artifact tool but no scheduling tool (plain Chat mode), don't stop: do every other step, then hand over the schedule as step 6 describes. Without the Artifact tool you can't publish the page; say so, and suggest Cowork.
 
 ## 1. Ask, in one go
 Keep it short; offer sensible defaults.
@@ -32,13 +32,19 @@ Edit `BRIEF_CONFIG` at the top of `page/index.html`:
    ```json
    {"db": {"rules": [{"path": "", "read": "owner", "write": "owner"}]}}
    ```
-4. `pin_artifact`, so it sits in their sidebar. Note the slug and the claude.ai URL.
+4. `pin_artifact`, so it sits in their sidebar; without that tool, tell them to pin the page themselves. Note the slug and the claude.ai URL.
 
 ## 5. Write the morning prompt
 Take everything below the line in `prompt/daily-brief.md` and fill in the placeholders: name, about, time zone, language, the two email addresses and the artifact slug. If they use only one inbox, remove that part, its document and its mention in the first paragraph and the final message. If their calendar is Google Calendar, rewrite Part 3's first line to read it from the Google Calendar connector; the data shape stays the same. Keep the hard limits exactly as they are.
 
 ## 6. Schedule it
 Create one scheduled task named `Daily brief`, daily at the time from step 1 in their time zone (for example `CRON_TZ=Europe/Amsterdam 19 8 * * *`; pick a minute off the hour), with the filled prompt. It runs in the cloud, so their computer can be off. If the scheduling tool or the task's settings let you choose its connectors, give it only the ones it reads (Gmail, Microsoft 365, Google Calendar): it reads mail from strangers, so it shouldn't hold tools it doesn't need. Tell them in one sentence whether its runs go ahead on their own or wait for approval, and that they can switch it to automatic approval in the task's settings if their organization allows it. If you can, run it once now so the page has today's brief; otherwise it fills in tomorrow morning.
+
+**No scheduling tool here?** Give them the filled prompt in one code block, ready to copy, and these steps:
+1. Open Cowork (switch the message box to Cowork, or use the desktop app), click **Scheduled** in the left sidebar, then **New task** → **Set up manually**.
+2. Name it `Daily brief`, paste the prompt, set it to run **daily** at their time, choose the approval mode (automatic approval, so it runs while they sleep), and save.
+3. Run it once from the task page so today's brief appears.
+On Team and Enterprise plans an owner may need to switch on Cowork, cloud sessions and scheduled tasks in the organization settings first.
 
 ## 7. Put it on their phone
 - **iPhone, home screen:** open the page's claude.ai link in Safari, tap ⋯ (bottom right) → Share → Add to Home Screen, and keep "Open as Web App" on.

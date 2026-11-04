@@ -11,13 +11,15 @@ Every morning, one scheduled task reads your inboxes and your calendar and write
 
 ## Set it up
 
-Open Claude (web, desktop or mobile), give it this repo and say:
+Open Claude in **Cowork** (or any chat, where chat and Cowork are one experience), give it this repo and say:
 
 > Set up my daily brief from this repo.
 
 Claude follows [`CLAUDE.md`](CLAUDE.md). It asks a few questions (your name, time zone, which inboxes, what you do), connects Gmail and/or Outlook, publishes the page to your account and schedules the morning run. At the end it walks you through putting the page on your phone's home screen and lock screen.
 
 **You need:** Claude with artifacts and scheduled tasks, plus the Gmail and/or Microsoft 365 connectors (Google Calendar works too).
+
+In plain Chat mode Claude can build the page but not schedule the morning run, so it gives you the prompt and the three clicks to schedule it yourself.
 
 **Before you run it,** skim [`CLAUDE.md`](CLAUDE.md) and [`prompt/daily-brief.md`](prompt/daily-brief.md). They're short, and they're exactly what your Claude will follow with access to your mail.
 
@@ -28,6 +30,16 @@ Claude follows [`CLAUDE.md`](CLAUDE.md). It asks a few questions (your name, tim
 - **Your calls** for today and the rest of the week: who's joining, and which ones clash.
 - **One page** that updates itself. Tap *Need you* for everything waiting on you, with a button that opens each email. Fold an inbox you don't need right now. Tap the clock to see the view.
 - **Read-only.** It never sends, archives or changes anything in your mail or calendar, and it ignores instructions hidden in emails. The only thing it writes is the page's own data, which only you can read.
+
+## Security
+
+The morning task reads email from strangers, so it's built not to be talked into anything:
+
+- **Email is data, not instructions.** The prompt tells it to ignore anything in an email or calendar invite that asks it to act, whoever it claims to be from, and lists the only tools it may use: searching and reading mail and calendar, and writing the page's data.
+- **Read-only.** It never sends, replies, forwards, deletes or changes anything in your mail or calendar, and never opens links in emails.
+- **Links are checked.** The page only shows an Open button for Gmail and Outlook links, so a link planted in an email can't hide behind one. All text is escaped, so nothing in an email can run as code on the page.
+- **Your data stays yours.** The page's data is readable by you alone, even if you share the page, and the page loads nothing from outside.
+- **Give it fewer tools.** Instructions to an AI are a strong guardrail, not a lock. If your task's settings let you choose connectors, give it only Gmail and Microsoft 365, and keep them read-only where your admin allows.
 
 ## What's in here
 
