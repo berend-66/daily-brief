@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Daily brief</title>
+<script>
+/* ── Your settings ───────────────────────────────────────────────────────────────────
+   timeZone    the clock, "today", the greeting and the calendar use it (an IANA name)
+   latitude,   roughly where you live: sunrise and sunset decide when the morning,
+   longitude   evening and night backgrounds show
+   background  'photos'  the seeded photos; the daytime one is alive (clouds, water, sheep)
+               'ink'     painted landscapes, no photos and no animation
+   inboxes     how each inbox is labelled; set one to null to hide it (Outlook → brief/outlook,
+               Gmail → brief/gmail, as the scheduled task writes them)
+   scene       optional: the numbers that belong to your own daytime photo, once you
+               bring it to life (see background/README.md). Leave it out for the sheep. */
+window.BRIEF_CONFIG = {
+  timeZone: 'Europe/Amsterdam',
+  latitude: 52.37,
+  longitude: 4.90,
+  background: 'photos',
+  inboxes: {
+    work:     { label: 'Work',     account: 'Outlook' },
+    personal: { label: 'Personal', account: 'Gmail' }
+  }
+};
+</script>
+<script>
+/* Background set and time of day (see BRIEF_CONFIG above) */
+(function(){
+  var CFG = window.BRIEF_CONFIG || {}, SC0 = CFG.scene || {};
+  var BG_SET = window.__BG_SET_OVERRIDE || CFG.background || 'photos';
+  var SETS = {
+    photos: {
+      dawn:    {src:'photo-day.jpg',     pos:SC0.position ? (SC0.position[0]*100)+'% '+(SC0.position[1]*100)+'%' : '50% 58%', tone:'smoke'},
+      evening: {src:'photo-evening.jpg', pos:'50% 50%', tone:'smoke'},
+      night:   {src:'photo-night.jpg',   pos:'40% 64%', tone:'smoke'}
+    },
+    ink: {
+      dawn:    {src:'ink-dawn.jpg',    pos:'72% 50%', tone:'light'},
+      evening: {src:'ink-evening.jpg', pos:'72% 50%', tone:'smoke'},
+      night:   {src:'ink-night.jpg',   pos:'72% 50%', tone:'dark'}
+    }
+  };
+  /* Sunrise and sunset where you live (standard solar formulas) */
+  var LAT=+(CFG.latitude!=null?CFG.latitude:52.37), LON=+(CFG.longitude!=null?CFG.longitude:4.90), rad=Math.PI/180, dayMs=864e5, J1970=2440588, J2000=2451545, ecl=rad*23.4397, J0=0.0009;
+  function sunTimes(date){
+    var lw=rad*-LON, phi=rad*LAT, d=date.valueOf()/dayMs-0.5+J1970-J2000,
+        n=Math.round(d-J0-lw/(2*Math.PI)), ds=J0+lw/(2*Math.PI)+n,
+        m=rad*(357.5291+0.98560028*ds), C=rad*(1.9148*Math.sin(m)+0.02*Math.sin(2*m)+0.0003*Math.sin(3*m)),
+        l=m+C+rad*102.9372+Math.PI, dc=Math.asin(Math.sin(ecl)*Math.sin(l)),
+        Jnoon=J2000+ds+0.0053*Math.sin(m)-0.0069*Math.sin(2*l),
+        w=Math.acos((Math.sin(rad*-0.833)-Math.sin(phi)*Math.sin(dc))/(Math.cos(phi)*Math.cos(dc))),
+        a=J0+(w+lw)/(2*Math.PI)+n, Jset=J2000+a+0.0053*Math.sin(m)-0.0069*Math.sin(2*l), Jrise=Jnoon-(Jset-Jnoon);
+    return {rise:(Jrise+0.5-J1970)*dayMs, set:(Jset+0.5-J1970)*dayMs};
+  }
+  var TZ0 = CFG.timeZone || 'Europe/Amsterdam';
+  var ymdF = new Intl.DateTimeFormat('en-CA',{timeZone:TZ0,year:'numeric',month:'2-digit',day:'2-digit'});
+  function sceneAt(now){
+    try{
+      var p=ymdF.format(now).split('-').map(Number), t=sunTimes(new Date(Date.UTC(p[0],p[1]-1,p[2],12))), ms=now.getTime(), H=36e5;
+      if(!isFinite(t.rise)||!isFinite(t.set)) throw 0;
+      if(ms<t.rise-H || ms>=t.set+1.5*H) return 'night';   /* from 90 min after sunset until an hour before sunrise */
+      if(ms>=t.set-H) return 'evening';                      /* the hour before sunset until 90 min after */
+      return 'dawn';                                         /* morning and daytime */
+    }catch(e){
+      var h=+new Intl.DateTimeFormat('en-GB',{timeZone:TZ0,hour:'numeric',hourCycle:'h23'}).format(now);
+      return h>=6&&h<17?'dawn':h>=17&&h<20?'evening':'night';
+    }
+  }
+  var s=sceneAt(new Date()), cfg=SETS[BG_SET][s], r=document.documentElement;
+  r.setAttribute('data-scene',s); r.setAttribute('data-tone',cfg.tone);
+  try{ new Image().src=cfg.src; }catch(e){}
+  window.BRIEF={BG_SET:BG_SET, SETS:SETS, sceneAt:sceneAt};
+})();
+</script>
+<style>
+:root{
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Segoe UI",system-ui,sans-serif;
+  --font-display:-apple-system,BlinkMacSystemFont,"SF Pro Display","Inter Display","Inter","Segoe UI",system-ui,sans-serif;
+  --font-round:ui-rounded,"SF Pro Rounded",-apple-system,BlinkMacSystemFont,"Inter Display","Inter",system-ui,sans-serif;
+  --spring:cubic-bezier(.34,1.36,.52,1);
+  --ease:cubic-bezier(.2,.8,.2,1);
+
+  /* Light tone: dark text on clear frosted glass */
+  color-scheme:light;
+  --base:#e9ebee;
+  --label:#111214;--label2:rgba(17,18,20,.76);--label3:rgba(17,18,20,.62);--inv:#fff;
+  --sep:rgba(17,18,20,.1);
+  --fill:rgba(17,18,20,.06);--fill2:rgba(17,18,20,.12);
+  --bar:rgba(17,18,20,.62);--bar-past:rgba(17,18,20,.2);
+  --red:#d4574e;--live:#3d9467;--live-ring:rgba(61,148,103,.5);
+  --g-a:rgba(255,255,255,.34);--g-b:rgba(255,255,255,.13);
+  --g-edge:rgba(255,255,255,.55);--g-hi:rgba(255,255,255,.95);--g-bevel:rgba(255,255,255,.55);--g-lo:rgba(255,255,255,.3);
+  --g-blur:blur(16px) saturate(120%) brightness(1.07);
+  --g-shadow:0 1px 1px rgba(10,14,20,.04),0 16px 36px -16px rgba(10,14,20,.3);
+  --rim-a:rgba(255,255,255,1);--rim-b:rgba(255,255,255,.75);
+  --nav-a:rgba(255,255,255,.3);--nav-b:rgba(255,255,255,.08);
+  --nav-blur:blur(7px) saturate(140%) brightness(1.1);
+  --nav-shadow:0 16px 36px -14px rgba(10,14,20,.38),0 2px 8px rgba(10,14,20,.08);
+  --lens-a:rgba(255,255,255,.82);--lens-b:rgba(255,255,255,.34);
+  --chip-a:rgba(255,255,255,.66);--chip-b:rgba(255,255,255,.26);--chip-hi:rgba(255,255,255,.95);--chip-edge:rgba(255,255,255,.6);
+  --chip-shadow:0 1px 2px rgba(10,14,20,.08),0 4px 10px -6px rgba(10,14,20,.25);
+  --edge:rgba(225,228,232,.3);
+  --clock-a:rgba(17,18,20,.92);--clock-b:rgba(17,18,20,.66);--clock-shadow:0 1px 0 rgba(255,255,255,.5);
+  --hero-shadow:none;
+  --solid-card:#f7f7f8;--solid-nav:#fbfbfc;
+}
+/* Dark tone: white text on faint glass over a dark scene */
+:root[data-tone="dark"]{
+  color-scheme:dark;
+  --base:#0d0f12;
+  --label:#f5f5f7;--label2:rgba(245,245,247,.72);--label3:rgba(245,245,247,.54);--inv:#111214;
+  --sep:rgba(255,255,255,.11);
+  --fill:rgba(255,255,255,.07);--fill2:rgba(255,255,255,.13);
+  --bar:rgba(255,255,255,.75);--bar-past:rgba(255,255,255,.25);
+  --red:#ff7b72;--live:#6fd39a;--live-ring:rgba(111,211,154,.5);
+  --g-a:rgba(255,255,255,.12);--g-b:rgba(255,255,255,.035);
+  --g-edge:rgba(255,255,255,.16);--g-hi:rgba(255,255,255,.34);--g-bevel:rgba(255,255,255,.14);--g-lo:rgba(255,255,255,.07);
+  --g-blur:blur(18px) saturate(130%);
+  --g-shadow:0 1px 1px rgba(0,0,0,.3),0 18px 42px -16px rgba(0,0,0,.8);
+  --rim-a:rgba(255,255,255,.55);--rim-b:rgba(255,255,255,.18);
+  --nav-a:rgba(255,255,255,.14);--nav-b:rgba(255,255,255,.04);
+  --nav-blur:blur(9px) saturate(150%) brightness(1.05);
+  --nav-shadow:0 18px 44px -14px rgba(0,0,0,.85),0 3px 10px rgba(0,0,0,.4);
+  --lens-a:rgba(255,255,255,.26);--lens-b:rgba(255,255,255,.07);
+  --chip-a:rgba(255,255,255,.16);--chip-b:rgba(255,255,255,.05);--chip-hi:rgba(255,255,255,.3);--chip-edge:rgba(255,255,255,.12);
+  --chip-shadow:0 1px 2px rgba(0,0,0,.35),0 4px 10px -6px rgba(0,0,0,.6);
+  --edge:rgba(13,15,18,.35);
+  --clock-a:rgba(255,255,255,.97);--clock-b:rgba(255,255,255,.66);--clock-shadow:0 2px 14px rgba(0,0,0,.3);
+  --hero-shadow:0 1px 10px rgba(0,0,0,.3);
+  --solid-card:#1c1c1e;--solid-nav:#2c2c2e;
+}
+/* Smoke tone: white text on smoked glass, for photos and bright, busy scenes */
+:root[data-tone="smoke"]{
+  color-scheme:dark;
+  --base:#15171b;
+  --label:#fff;--label2:rgba(255,255,255,.84);--label3:rgba(255,255,255,.68);--inv:#111214;
+  --sep:rgba(255,255,255,.16);
+  --fill:rgba(255,255,255,.1);--fill2:rgba(255,255,255,.18);
+  --bar:rgba(255,255,255,.85);--bar-past:rgba(255,255,255,.3);
+  --red:#ff8a80;--live:#7be0a5;--live-ring:rgba(123,224,165,.55);
+  --g-a:rgba(14,18,24,.44);--g-b:rgba(14,18,24,.3);
+  --g-edge:rgba(255,255,255,.22);--g-hi:rgba(255,255,255,.38);--g-bevel:rgba(255,255,255,.16);--g-lo:rgba(255,255,255,.08);
+  --g-blur:blur(22px) saturate(150%) brightness(.82);
+  --g-shadow:0 1px 1px rgba(0,0,0,.2),0 18px 40px -16px rgba(0,0,0,.55);
+  --rim-a:rgba(255,255,255,.62);--rim-b:rgba(255,255,255,.2);
+  --nav-a:rgba(14,18,24,.34);--nav-b:rgba(14,18,24,.2);
+  --nav-blur:blur(12px) saturate(160%) brightness(.9);
+  --nav-shadow:0 16px 38px -14px rgba(0,0,0,.6),0 2px 8px rgba(0,0,0,.25);
+  --lens-a:rgba(255,255,255,.3);--lens-b:rgba(255,255,255,.1);
+  --chip-a:rgba(255,255,255,.2);--chip-b:rgba(255,255,255,.08);--chip-hi:rgba(255,255,255,.35);--chip-edge:rgba(255,255,255,.16);
+  --chip-shadow:0 1px 2px rgba(0,0,0,.3),0 4px 10px -6px rgba(0,0,0,.5);
+  --edge:rgba(0,0,0,.22);
+  --clock-a:rgba(255,255,255,.98);--clock-b:rgba(255,255,255,.8);--clock-shadow:0 2px 18px rgba(0,0,0,.45);
+  --hero-shadow:0 1px 2px rgba(0,0,0,.4),0 2px 20px rgba(0,0,0,.4);
+  --solid-card:#1c1c1e;--solid-nav:#2c2c2e;
+}
+
+*{box-sizing:border-box}
+html{background:var(--base)}
+body{margin:0;color:var(--label);font:400 15px/1.4 var(--font);letter-spacing:-.012em;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* The picture the glass sits on: one layer per time of day, cross-fading */
+.ambient{position:fixed;inset:0;z-index:-1;pointer-events:none;background:var(--base);overflow:hidden}
+.ambient i{position:absolute;inset:0;background-size:cover;background-repeat:no-repeat;background-position:50% 50%;opacity:0;transition:opacity 2.4s var(--ease)}
+.ambient i.on{opacity:1}
+.ambient canvas{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity 1.6s var(--ease)}
+.ambient canvas.on{opacity:1}
+/* Tap the clock to look at the view: the cards step aside, the hero and the tab bar stay */
+.clock[role=button]{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.clock[role=button]:focus-visible{outline:2px solid var(--label);outline-offset:6px;border-radius:10px}
+#main>*{transition:opacity .55s var(--ease),transform .55s var(--ease)}
+body.viewing #main>*:not(.hero-h){opacity:0;transform:translateY(10px);pointer-events:none}
+body.viewing .edge{opacity:0}
+
+.wrap{max-width:620px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 26px) calc(env(safe-area-inset-right) + 16px) calc(env(safe-area-inset-bottom) + 124px) calc(env(safe-area-inset-left) + 16px)}
+
+/* Hero: date, live clock, greeting */
+.hero-h{text-shadow:var(--hero-shadow);margin-bottom:22px}
+.eyebrow{font-size:13px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--label2)}
+.clock{display:block;width:max-content;font:600 76px/1 var(--font-round);letter-spacing:-.035em;font-variant-numeric:tabular-nums;margin:6px 0 10px;text-shadow:none;
+  background:linear-gradient(180deg,var(--clock-a),var(--clock-b));-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(var(--clock-shadow))}
+h1{font:700 26px/1.2 var(--font-display);letter-spacing:-.024em;margin:0 0 3px}
+.summary{font-size:17px;line-height:1.35;color:var(--label2);margin:0;letter-spacing:-.022em}
+
+/* Glass panels: clear, lightly frosted, bevelled edge that catches the light */
+.card{position:relative;border-radius:26px;overflow:hidden;
+  background:linear-gradient(150deg,var(--g-a),var(--g-b));
+  -webkit-backdrop-filter:var(--g-blur);backdrop-filter:var(--g-blur);
+  box-shadow:inset 0 0 0 1px var(--g-edge),inset 0 1px 0 var(--g-hi),inset 0 -1px 0 var(--g-lo),
+    inset 0 24px 30px -30px var(--g-bevel),inset 0 -20px 28px -28px var(--g-lo),var(--g-shadow)}
+.card::after,.glass::after{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;
+  background:linear-gradient(145deg,var(--rim-a),rgba(255,255,255,.2) 22%,rgba(255,255,255,0) 48%,rgba(255,255,255,.08) 74%,var(--rim-b));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude}
+
+.top{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:30px}
+.top .next{grid-column:1/-1}
+
+.next{padding:17px 18px 18px}
+.next-top{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600}
+.kicker{display:inline-flex;align-items:center;gap:7px;color:var(--label);text-transform:uppercase;letter-spacing:.04em}
+.kicker.quiet{color:var(--label2)}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.kicker.live .dot{background:var(--live);animation:pulse 2.2s var(--ease) infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 var(--live-ring)}100%{box-shadow:0 0 0 9px rgba(0,0,0,0)}}
+.when{margin-left:auto;color:var(--label2);font-weight:500;font-variant-numeric:tabular-nums;text-align:right}
+.next-title{font:600 22px/1.22 var(--font-display);letter-spacing:-.024em;margin:10px 0 4px}
+.next-meta{color:var(--label2);font-size:14px}
+.progress{height:4px;border-radius:2px;background:var(--fill2);margin-top:14px;overflow:hidden}
+.progress span{display:block;height:100%;width:0;background:var(--label);border-radius:inherit;transition:width .6s var(--ease)}
+.then{margin-top:14px;padding-top:12px;font-size:13px;color:var(--label2);position:relative}
+.then::before{content:"";position:absolute;top:0;left:0;right:0;height:1px;transform:scaleY(.5);transform-origin:0 0;background:var(--sep)}
+.then b{color:var(--label);font-weight:600}
+
+.stat{padding:14px 15px 15px;min-height:108px;display:flex;flex-direction:column}
+.stat .num{font:600 30px/1 var(--font-round);letter-spacing:-.02em;margin-top:auto;padding-top:12px;font-variant-numeric:tabular-nums}
+.stat .lbl{font-size:13px;font-weight:600;margin-top:4px;color:var(--label2)}
+
+/* Small glass pieces: icon tiles, buttons, badges, chips */
+.tile,.ico,.btn,.badge,.chip{background:linear-gradient(180deg,var(--chip-a),var(--chip-b));box-shadow:inset 0 1px 0 var(--chip-hi),inset 0 0 0 .5px var(--chip-edge),var(--chip-shadow)}
+.tile{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;color:var(--label)}
+.tile svg.i{width:18px;height:18px;stroke-width:2}
+.tile.strong{background:var(--label);color:var(--inv);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),var(--chip-shadow)}
+.tile.ph{background:var(--fill);box-shadow:none}
+.ico{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:var(--label)}
+.ico svg.i{width:17px;height:17px;stroke-width:2}
+.btn{display:inline-flex;align-items:center;gap:2px;align-self:center;font-size:13px;font-weight:600;color:var(--label);padding:6px 10px 6px 12px;border-radius:999px;text-decoration:none;white-space:nowrap;-webkit-tap-highlight-color:transparent;transition:transform .35s var(--spring)}
+.btn svg.i{width:14px;height:14px;stroke-width:2.2}
+.btn:hover{transform:translateY(-1px)}
+.btn:active{transform:scale(.92)}
+.btn:focus-visible{outline:2px solid var(--label);outline-offset:2px}
+.badge{display:inline-flex;align-items:center;font-size:12px;font-weight:600;line-height:1;padding:4px 9px;border-radius:999px;color:var(--label2)}
+.badge.tent{background:transparent;box-shadow:inset 0 0 0 1px var(--label3)}
+.badge.now{color:var(--label)}
+.badge.now::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--live);margin-right:6px}
+.chip{font-size:13px;font-weight:500;color:var(--label2);border-radius:999px;padding:5px 11px}
+.chip b{color:var(--label);font-weight:600;margin-right:4px;font-variant-numeric:tabular-nums}
+/* Data view: the raw database entries */
+.dv{display:grid;gap:14px}
+.dv-h{position:relative;display:flex;align-items:center;gap:12px;padding:13px 16px 10px}
+.dv-h code{font:600 13px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:0}
+.dv-h .stamp{margin-left:auto}
+.dv-json{margin:0;padding:2px 16px 16px;font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:0;white-space:pre-wrap;word-break:break-word;color:var(--label2)}
+.dv-json .k{color:var(--label);font-weight:600}.dv-json .n{color:var(--label)}
+.dv-empty{padding:0 16px 16px;font-size:14px;color:var(--label2)}
+/* Inbox blocks: one card per account, grouped inside */
+.grp{position:relative;padding:13px 16px 0;font-size:11.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--label3)}
+.grp:not(:first-child)::before{content:"";position:absolute;top:0;left:16px;right:0;height:1px;transform:scaleY(.5);transform-origin:0 0;background:var(--sep)}
+.grp+.row{padding-top:9px}
+.grp+.chips{padding-top:9px}
+.acct{display:inline-flex;align-items:center;vertical-align:3px;margin-left:8px;font:600 12px/1 var(--font);letter-spacing:0;padding:5px 9px;border-radius:999px;color:var(--label);text-shadow:none;
+  background:linear-gradient(150deg,var(--g-a),var(--g-b));-webkit-backdrop-filter:var(--g-blur);backdrop-filter:var(--g-blur);
+  box-shadow:inset 0 0 0 1px var(--g-edge),inset 0 1px 0 var(--g-hi)}
+
+/* Sections */
+.sec{margin-bottom:28px}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0 4px 10px;text-shadow:var(--hero-shadow)}
+.sec-h h2{font:600 20px/1.2 var(--font-display);letter-spacing:-.022em;margin:0}
+.stamp{font-size:13px;color:var(--label3);white-space:nowrap;font-variant-numeric:tabular-nums}
+.stamp.stale{color:var(--label);font-weight:600}
+.day-h{font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.02em;color:var(--label2);margin:18px 4px 8px;text-shadow:var(--hero-shadow)}
+.day-h.first{margin-top:0}
+
+/* Rows */
+.row{position:relative;display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:12px;align-items:start;padding:13px 16px}
+.row+.row::before{content:"";position:absolute;top:0;right:0;left:62px;height:1px;transform:scaleY(.5);transform-origin:0 0;background:var(--sep)}
+.row.calm{align-items:center}
+.r-title{font-weight:600;font-size:15px;line-height:1.3;letter-spacing:-.016em}
+.r-sub{color:var(--label2);font-size:14px;margin-top:2px}
+.r-meta{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin-top:7px;font-size:13px;color:var(--label3)}
+.deadline{display:flex;gap:5px;align-items:flex-start;margin-top:7px;font-size:13px;font-weight:600;color:var(--label)}
+.deadline svg.i{width:15px;height:15px;margin-top:1px;stroke-width:2}
+
+/* Calls */
+.call{position:relative;display:grid;grid-template-columns:46px 3px minmax(0,1fr);gap:12px;padding:12px 16px}
+.call+.call::before{content:"";position:absolute;top:0;right:0;left:74px;height:1px;transform:scaleY(.5);transform-origin:0 0;background:var(--sep)}
+.c-time{font-variant-numeric:tabular-nums;font-size:15px;font-weight:600;letter-spacing:-.01em;line-height:1.3}
+.c-time small{display:block;font-size:13px;font-weight:400;color:var(--label3)}
+.c-bar{border-radius:2px;background:var(--bar);min-height:38px}
+.call.past{opacity:.5}
+.call.past .c-bar{background:var(--bar-past)}
+.call.now .c-bar{background:var(--live)}
+.call.tent .c-bar{background:repeating-linear-gradient(180deg,var(--bar) 0 5px,transparent 5px 9px)}
+.c-title{font-weight:600;font-size:15px;line-height:1.3;letter-spacing:-.016em}
+.c-who{font-size:14px;color:var(--label2);margin-top:2px}
+.c-flags{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.overlap{display:flex;gap:5px;align-items:center;font-size:13px;font-weight:600;color:var(--label);margin-top:7px}
+.overlap svg.i{width:15px;height:15px;stroke-width:2}
+.nowline{display:grid;grid-template-columns:46px minmax(0,1fr);gap:12px;align-items:center;padding:0 16px;height:20px}
+.nowline b{font-size:12px;font-weight:600;color:var(--red);font-variant-numeric:tabular-nums}
+.nowline i{position:relative;height:1.5px;border-radius:1px;background:var(--red)}
+.nowline i::before{content:"";position:absolute;left:-2.5px;top:50%;width:8px;height:8px;margin-top:-4px;border-radius:50%;background:var(--red)}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;padding:14px 16px}
+.empty{padding:15px 16px;color:var(--label2);font-size:14px}
+.banner{margin-bottom:16px}
+.foot{text-align:center;font-size:12px;color:var(--label3);margin:4px 0 0;text-shadow:var(--hero-shadow)}
+/* Text sitting directly on a photo: near-white so it holds up over bright sky */
+:root[data-tone="smoke"] .eyebrow,:root[data-tone="smoke"] .summary,:root[data-tone="smoke"] .sec-h .stamp,
+:root[data-tone="smoke"] .day-h,:root[data-tone="smoke"] .foot{color:rgba(255,255,255,.95)}
+
+.skel{display:block;height:11px;border-radius:6px;background:linear-gradient(90deg,var(--fill) 30%,var(--fill2) 50%,var(--fill) 70%) 0 0/200% 100%;animation:shimmer 1.6s linear infinite}
+.skel+.skel{margin-top:9px}
+.skel.w40{width:40%}.skel.w60{width:60%}.skel.w80{width:80%}.skel.num{height:26px;width:34px;margin-top:auto}
+@keyframes shimmer{to{background-position:-200% 0}}
+
+/* Navigation glass: the clearest layer, floating above everything */
+.glass{
+  background:linear-gradient(180deg,var(--nav-a),var(--nav-b));
+  -webkit-backdrop-filter:var(--nav-blur);backdrop-filter:var(--nav-blur);
+  box-shadow:inset 0 0 0 1px var(--g-edge),inset 0 1.5px 0 var(--g-hi),inset 0 -1px 1.5px var(--g-lo),var(--nav-shadow)}
+.tabbar{position:fixed;z-index:30;left:50%;bottom:calc(env(safe-area-inset-bottom) + 14px);transform:translateX(-50%);display:flex;padding:5px;border-radius:999px}
+.tabbar button{position:relative;z-index:1;appearance:none;border:0;background:none;font:inherit;color:var(--label2);display:flex;flex-direction:column;align-items:center;gap:2px;width:88px;padding:7px 0 6px;border-radius:999px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:transform .4s var(--spring),color .25s}
+.tabbar button span{font-size:10.5px;font-weight:600;letter-spacing:.005em}
+.tabbar button svg.i{width:24px;height:24px}
+.tabbar button[aria-selected="true"]{color:var(--label)}
+.tabbar button:active{transform:scale(.92)}
+.tabbar button:focus-visible{outline:2px solid var(--label);outline-offset:-2px}
+.lens{position:absolute;top:5px;bottom:5px;left:0;width:88px;border-radius:999px;
+  background:radial-gradient(120% 160% at 50% 0%,var(--lens-a),var(--lens-b));
+  box-shadow:inset 0 1px 0 var(--chip-hi),inset 0 -1px 1px var(--g-lo),inset 0 0 0 .5px var(--chip-edge),0 3px 12px -4px rgba(10,14,20,.25);
+  transition:transform .55s var(--spring),width .55s var(--spring),scale .3s var(--ease)}
+.lens.moving{scale:1.07 .94}
+.lens.instant{transition:none}
+
+/* Scroll edge: content softens as it slides under the glass */
+.edge{position:fixed;left:0;right:0;z-index:20;pointer-events:none;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.edge.t{top:0;height:calc(env(safe-area-inset-top) + 34px);background:linear-gradient(var(--edge),transparent);-webkit-mask-image:linear-gradient(#000 35%,transparent);mask-image:linear-gradient(#000 35%,transparent)}
+.edge.b{bottom:0;height:calc(env(safe-area-inset-bottom) + 100px);background:linear-gradient(transparent,var(--edge));-webkit-mask-image:linear-gradient(transparent,#000 65%);mask-image:linear-gradient(transparent,#000 65%)}
+
+/* Motion: each surface animates itself, so its glass keeps sampling the picture */
+@keyframes rise{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:none}}
+.anim .hero-h,.anim .card,.anim .sec-h,.anim .day-h{animation:rise .65s var(--ease) both}
+
+/* Wide screens: iPad/Mac pattern, tab bar floats at the top */
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;align-items:start}
+@media (min-width:900px){
+  .wrap{max-width:1060px;padding:96px 32px 56px}
+  .clock{font-size:96px}
+  h1{font-size:30px}
+  .top{grid-template-columns:minmax(0,1.75fr) repeat(3,minmax(0,1fr));gap:14px}
+  .top .next{grid-column:auto}
+  .tabbar{top:18px;bottom:auto}
+  .tabbar button{flex-direction:row;gap:7px;width:auto;padding:9px 18px}
+  .tabbar button span{font-size:14px;letter-spacing:-.01em}
+  .tabbar button svg.i{width:19px;height:19px}
+  .edge.t{height:96px}
+  .edge.b{display:none}
+}
+
+/* Accessibility fallbacks */
+@supports not ((-webkit-backdrop-filter:blur(1px)) or (backdrop-filter:blur(1px))){
+  .glass{background:var(--solid-nav)}
+  .card{background:var(--solid-card)}
+  .edge{display:none}
+}
+/* Tappable tiles and the summary link */
+button.card{appearance:none;border:0;font:inherit;color:inherit;text-align:left;cursor:pointer;width:100%;-webkit-tap-highlight-color:transparent;transition:transform .35s var(--spring)}
+button.card:active{transform:scale(.96)}
+button.card:focus-visible{outline:2px solid var(--label);outline-offset:3px}
+.stat .go{position:absolute;top:13px;right:13px;width:16px;height:16px;color:var(--label3)}
+.stat .go svg.i{width:16px;height:16px;stroke-width:2.2}
+.sum-link{appearance:none;border:0;background:none;font:inherit;color:var(--label);font-weight:600;padding:0;cursor:pointer;text-decoration:underline;text-decoration-color:var(--label3);text-underline-offset:3px;text-shadow:inherit;-webkit-tap-highlight-color:transparent}
+.sum-link:focus-visible{outline:2px solid var(--label);outline-offset:3px;border-radius:4px}
+
+/* Inbox sections fold open and closed (remembered per inbox) */
+.ib-head{margin:0;font:inherit;min-width:0;flex:1}
+.ib-toggle{appearance:none;border:0;background:none;color:inherit;font:600 20px/1.2 var(--font-display);letter-spacing:-.022em;display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;padding:2px 0;margin:-2px 0;cursor:pointer;text-align:left;min-width:0;max-width:100%;text-shadow:inherit;-webkit-tap-highlight-color:transparent}
+.ib-toggle:focus-visible{outline:2px solid var(--label);outline-offset:4px;border-radius:8px}
+.ib-toggle .acct{margin-left:2px}
+.ib-toggle .chev{width:18px;height:18px;flex:none;stroke-width:2.4;transition:transform .35s var(--spring)}
+.ib.closed .ib-toggle .chev{transform:rotate(-90deg)}
+.ib-sum{flex-basis:100%;padding-left:26px;font:500 13.5px/1.3 var(--font);letter-spacing:0;color:var(--label2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ib-sum b{color:var(--label);font-weight:600}
+.ib:not(.closed) .ib-sum{display:none}
+.ib-body{display:grid;grid-template-rows:1fr;transition:grid-template-rows .4s var(--ease)}
+.ib.closed .ib-body{grid-template-rows:0fr}
+.ib-in{overflow:hidden;min-height:0}
+.ib.closed .ib-in>.card{visibility:hidden;transition:visibility 0s .4s}
+.ib.closed .sec-h .stamp{display:none}
+.ib.closed{margin-bottom:18px}
+
+/* "Needs you" sheet: slides up on the phone, floats in the middle on a wide screen */
+.sheet-wrap{position:fixed;inset:0;z-index:60;display:flex;align-items:flex-end;justify-content:center}
+.sheet-wrap[hidden]{display:none}
+.sheet-scrim{position:absolute;inset:0;background:rgba(0,0,0,.32);opacity:0;transition:opacity .3s var(--ease)}
+.sheet{position:relative;width:min(620px,100%);max-height:min(84vh,780px);display:flex;flex-direction:column;border-radius:30px 30px 0 0;
+  padding:8px 0 calc(env(safe-area-inset-bottom) + 10px);transform:translateY(102%);transition:transform .45s var(--spring);
+  background:linear-gradient(170deg,var(--g-a),var(--g-b));-webkit-backdrop-filter:var(--g-blur);backdrop-filter:var(--g-blur);
+  box-shadow:inset 0 0 0 1px var(--g-edge),inset 0 1px 0 var(--g-hi),0 -20px 60px -20px rgba(0,0,0,.55)}
+.sheet-wrap.open .sheet-scrim{opacity:1}
+.sheet-wrap.open .sheet{transform:none}
+.sheet-grab{width:40px;height:5px;border-radius:3px;background:var(--label3);margin:4px auto 4px;opacity:.7}
+.sheet-h{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 18px 6px 20px}
+.sheet-h h2{font:700 24px/1.2 var(--font-display);letter-spacing:-.024em;margin:0}
+.sheet-h h2 small{font:600 15px/1 var(--font);color:var(--label2);margin-left:8px;letter-spacing:0}
+.sheet-x{appearance:none;border:0;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:var(--label);cursor:pointer;font:inherit;
+  background:linear-gradient(180deg,var(--chip-a),var(--chip-b));box-shadow:inset 0 1px 0 var(--chip-hi),inset 0 0 0 .5px var(--chip-edge),var(--chip-shadow)}
+.sheet-x svg.i{width:16px;height:16px;stroke-width:2.4}
+.sheet-x:focus-visible{outline:2px solid var(--label);outline-offset:2px}
+.sheet-b{overflow:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:0 4px 8px}
+.sheet-b .grp:first-child{padding-top:8px}
+.sheet-b .grp .acct{margin-left:6px;vertical-align:0}
+.sheet-f{display:flex;justify-content:center;padding:10px 16px 4px}
+@media (min-width:900px){
+  .sheet-wrap{align-items:center}
+  .sheet{border-radius:28px;max-height:min(78vh,760px);padding-bottom:12px;transform:translateY(18px) scale(.97);opacity:0;transition:transform .4s var(--spring),opacity .25s var(--ease);box-shadow:inset 0 0 0 1px var(--g-edge),inset 0 1px 0 var(--g-hi),0 30px 80px -24px rgba(0,0,0,.6)}
+  .sheet-wrap.open .sheet{opacity:1}
+  .sheet-grab{display:none}
+}
+html.locked,html.locked body{overflow:hidden}
+
+@media (prefers-reduced-transparency:reduce){
+  .sheet{background:var(--solid-card);-webkit-backdrop-filter:none;backdrop-filter:none}
+  .glass{background:var(--solid-nav);-webkit-backdrop-filter:none;backdrop-filter:none}
+  .card{background:var(--solid-card);-webkit-backdrop-filter:none;backdrop-filter:none}
+  .edge{display:none}
+}
+@media (prefers-contrast:more){
+  :root[data-tone="light"]{--label2:rgba(17,18,20,.9);--label3:rgba(17,18,20,.8);--sep:rgba(17,18,20,.4)}
+  :root[data-tone="dark"],:root[data-tone="smoke"]{--label2:rgba(255,255,255,.9);--label3:rgba(255,255,255,.78);--sep:rgba(255,255,255,.4)}
+  .card{background:var(--solid-card);box-shadow:0 0 0 1px var(--sep)}
+  .glass{background:var(--solid-nav);box-shadow:0 0 0 1px var(--label3),var(--nav-shadow)}
+  .card::after,.glass::after{display:none}
+}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="ambient" aria-hidden="true"><i data-s="dawn"></i><i data-s="evening"></i><i data-s="night"></i><canvas id="living"></canvas></div>
+<script>
+/* Living photo: the daytime photo drawn live in WebGL. Clouds drift behind the mountains, the lake glints, wind runs
+   through the grass, and ten sheep (drawn, not filmed) wander the fenced field at random, so it never loops.
+   Runs only for the daytime photo, at most 30 fps, and pauses whenever the tab is hidden or another scene shows. */
+(function(){
+'use strict';
+/* Everything that belongs to the daytime photo lives here. The defaults are for the seeded sheep photo.
+   To bring your own photo to life, put its numbers in BRIEF_CONFIG.scene and replace the images boot()
+   loads below; background/README.md walks through it. */
+var SC = Object.assign({
+  size: [3024, 4032],                    // the photo's width and height in pixels
+  position: [0.5, 0.58],                 // how the photo is framed on screen (CSS background-position)
+  clouds: true, water: true,             // drift the sky; glint the water (masks.png red and green)
+  skyRows: [1242, 1736],                 // image rows covered by sky-matte.png (the exact skyline)
+  cloudSpeed: 9, wrap: 360,              // cloud drift (image px per second) and the width of the wrap blend
+  clean: [1230, 2262, 1180, 94],         // flock-clean.png: grass painted over the real flock (x, y, w, h), or null
+  sheep: true, sheepCount: 10,           // our own sheep, wandering the field below
+  occluderRows: [2490, 2750],            // rows of occ.png: fence posts and weeds that pass in front of the sheep
+  camera: {f: 2184, cx: 1512, horizon: 2182, groundScale: 9479},   // ground plane -> photo (pinhole camera)
+  bodyLength: 1.05,                      // a sheep is about a metre long
+  posts: [[417, 2660], [1358, 2698], [2378, 2726]],                 // where the near fence posts meet the grass
+  field: {x0: 90, x1: 2934, y0: 2296, margin: 1.6},                 // the fenced field: image x range, far edge row, metres behind the fence
+  wool: {hi: [0.867, 0.796, 0.686], mid: [0.69, 0.616, 0.502], lo: [0.455, 0.396, 0.306], dark: [0.176, 0.137, 0.082]}   // sampled from the real flock (Display P3)
+}, (window.BRIEF_CONFIG || {}).scene || {});
+var IMG_W = SC.size[0], IMG_H = SC.size[1], POS = SC.position;
+var CLEAN = SC.clean || [0, 0, 0, 0];
+var BAND = SC.skyRows;
+var SKY_V = SC.cloudSpeed, WRAP = SC.wrap;
+var OCC = SC.occluderRows;
+var MAX_PX = 6.5e6, FPS = 30;
+var COL = SC.wool;
+var canvas = document.getElementById('living');
+var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+var on = {clouds: SC.clouds !== false, water: SC.water !== false, grass: false, depth: false};
+var amp = {clouds: 0, water: 0, grass: 0, depth: 0};
+var sheepOn = SC.sheep !== false, started = false, holding = false;
+var t = 0, last = 0, raf = 0, frames = 0, fpsT = 0, fps = 0;
+function load(src){ return new Promise(function(res, rej){ var i = new Image(); i.decoding = 'async'; i.onload = function(){ res(i); }; i.onerror = function(){ rej(new Error('load ' + src)); }; i.src = src; }); }
+
+/* ---------------- shaders ---------------- */
+var VS = 'attribute vec2 aP;void main(){gl_Position=vec4(aP,0.0,1.0);}';
+
+/* One-off resampling pass (Lanczos-3, separable), run when the layout changes: bakes the photo at one
+   texel per screen pixel, as sharp as the browser draws the <img>; optionally paints grass where the flock stood. */
+var FS_DOWN = [
+'precision highp float;',
+'uniform sampler2D uSrc,uPatchTex;uniform vec2 uSrcSize;',
+'uniform float uAxis,uS,uO,uRow0,uLo,uHi,uPatch;uniform vec4 uPR;',
+'float L(float x){x=abs(x);if(x<1e-4)return 1.0;if(x>=3.0)return 0.0;float p=3.14159265*x;return 3.0*sin(p)*sin(p/3.0)/(p*p);}',
+'vec4 src(vec2 k){',
+'  vec4 c=texture2D(uSrc,(k+0.5)/uSrcSize);',
+'  if(uPatch>0.5){vec2 l=k-uPR.xy;if(l.x>=0.0&&l.y>=0.0&&l.x<uPR.z&&l.y<uPR.w){vec4 pc=texture2D(uPatchTex,(l+0.5)/uPR.zw);c.rgb=c.rgb*(1.0-pc.a)+pc.rgb;}}',
+'  return c;}',
+'void main(){',
+'  vec2 o=floor(gl_FragCoord.xy);',
+'  float a=uAxis<0.5?o.x:o.y, other=uAxis<0.5?o.y:o.x;',
+'  float sc=(a+0.5+uO)/uS;',
+'  float fs=min(uS,1.0), r=3.0/fs;',
+'  float k0=floor(sc-r), k1=ceil(sc+r);',
+'  vec4 acc=vec4(0.0);float ws=0.0;',
+'  for(int i=0;i<96;i++){',
+'    float k=k0+float(i);if(k>k1)break;',
+'    float w=L((k+0.5-sc)*fs);',
+'    float kc=clamp(k,uLo,uHi);',
+'    vec2 tp=uAxis<0.5?vec2(kc,other+uRow0):vec2(other,kc-uRow0);',
+'    acc+=src(tp)*w;ws+=w;',
+'  }',
+'  gl_FragColor=clamp(acc/ws,0.0,1.0);',
+'}'].join('\n');
+
+/* The scene: photo, drifting sky, lake ripples, wind in the grass */
+var FS = [
+'precision highp float;',
+'uniform sampler2D uPhoto,uOrig,uMask,uDepth,uSky,uMatte,uRidge,uFill;',
+'uniform vec2 uRes;uniform float uS;uniform vec2 uOff;uniform vec4 uTex,uSkyT,uMatT;uniform vec2 uBand;uniform vec2 uImg;',
+'uniform float uT,uOrigOn,uFlockOn;uniform vec4 uAmp;uniform vec3 uPar;uniform vec2 uFocus;',
+'uniform float uSkyV,uWrap;uniform vec2 uFillY;',
+'vec4 cr(sampler2D tx,vec2 sp,vec2 ts){',
+'  vec2 t1=floor(sp-0.5)+0.5;vec2 f=sp-t1;',
+'  vec2 w0=f*(-0.5+f*(1.0-0.5*f)),w1=1.0+f*f*(-2.5+1.5*f),w2=f*(0.5+f*(2.0-1.5*f)),w3=f*f*(-0.5+0.5*f);',
+'  vec2 w12=w1+w2;vec2 t12=(t1+w2/w12)/ts,t0=(t1-1.0)/ts,t3=(t1+2.0)/ts;',
+'  vec4 r=texture2D(tx,vec2(t0.x,t0.y))*w0.x*w0.y+texture2D(tx,vec2(t12.x,t0.y))*w12.x*w0.y+texture2D(tx,vec2(t3.x,t0.y))*w3.x*w0.y',
+'   +texture2D(tx,vec2(t0.x,t12.y))*w0.x*w12.y+texture2D(tx,vec2(t12.x,t12.y))*w12.x*w12.y+texture2D(tx,vec2(t3.x,t12.y))*w3.x*w12.y',
+'   +texture2D(tx,vec2(t0.x,t3.y))*w0.x*w3.y+texture2D(tx,vec2(t12.x,t3.y))*w12.x*w3.y+texture2D(tx,vec2(t3.x,t3.y))*w3.x*w3.y;',
+'  return clamp(r,0.0,1.0);}',
+'vec3 base(vec2 c,bool sharp){vec2 uv=(c-uTex.xy)/uTex.zw;',
+'  if(uFlockOn>0.5){return sharp?cr(uOrig,c-uTex.xy,uTex.zw).rgb:texture2D(uOrig,uv).rgb;}',
+'  return sharp?cr(uPhoto,c-uTex.xy,uTex.zw).rgb:texture2D(uPhoto,uv).rgb;}',
+'float h12(vec2 p){vec3 q=fract(vec3(p.xyx)*.1031);q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}',
+'float vn(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*(3.0-2.0*f);',
+'  return mix(mix(h12(i),h12(i+vec2(1.0,0.0)),u.x),mix(h12(i+vec2(0.0,1.0)),h12(i+vec2(1.0,1.0)),u.x),u.y);}',
+/* sky plate: the photo's own sky, mirrored under the skyline so clouds can pass behind the peaks, wrapped across the width */
+'float ridgeAt(float x){vec4 r=texture2D(uRidge,vec2((floor(clamp(x,0.0,uImg.x-1.0))+0.5)/uImg.x,0.5));return (r.r*65280.0+r.g*255.0)/8.0;}',
+'vec3 skyPx(vec2 ip){vec2 c=ip*uS+uOff-uSkyT.xy;return texture2D(uSky,c/uSkyT.zw).rgb;}',
+'float matteAt(vec2 ip){vec2 c=ip*uS+uOff;if(c.y<uBand.x)return 1.0;if(c.y>=uBand.y)return 0.0;return texture2D(uMatte,(vec2(ip.x*uS+uOff.x,c.y)-uMatT.xy)/uMatT.zw).r;}',
+'vec3 skyRaw(float x,float y){',
+'  float m=smoothstep(0.6,1.0,matteAt(vec2(x,y)))*smoothstep(6.0,10.0,ridgeAt(x)-y);',
+'  vec3 fl=texture2D(uFill,vec2(x/uImg.x,(y-uFillY.x)/uFillY.y)).rgb;',
+'  return m>0.999?skyPx(vec2(x,y)):mix(fl,skyPx(vec2(x,y)),m);}',
+'vec3 skyAt(vec2 ip){float P=uImg.x+uWrap;float x=mod(ip.x,P);if(x<uImg.x)return skyRaw(x,ip.y);',
+'  float u=x-uImg.x;float k=smoothstep(0.0,1.0,u/uWrap);return mix(skyRaw(uImg.x-1.0-u,ip.y),skyRaw(uWrap-u,ip.y),k);}',
+'vec2 billow(vec2 q,float t){return (vec2(vn(q*0.0032+vec2(t*0.05,0.0)),vn(q*0.0032+vec2(5.2,t*0.043)))-0.5)*7.0;}',
+'void main(){',
+'  vec2 sc=vec2(gl_FragCoord.x,uRes.y-gl_FragCoord.y);',
+'  if(uOrigOn>0.5){gl_FragColor=vec4(texture2D(uOrig,(sc-uTex.xy)/uTex.zw).rgb,1.0);return;}',
+'  vec2 p=(sc-uOff)/uS;',
+'  float edge=smoothstep(0.0,80.0,min(min(p.x,uImg.x-p.x),min(p.y,uImg.y-p.y)));',
+'  vec2 q=p;',
+'  if(uAmp.w>0.001){for(int i=0;i<2;i++){float d=texture2D(uDepth,q/uImg).r;q=p-(uPar.xy+(q-uFocus)*uPar.z)*d*edge*uAmp.w;}}',
+'  vec3 mk=texture2D(uMask,q/uImg).rgb;',
+'  float wat=mk.g*uAmp.y,grs=mk.b*uAmp.z;',
+'  vec2 disp=vec2(0.0);float sheen=0.0,spark=0.0;',
+/* lake: travelling ripples push the glints around, and the brightest glints flicker */
+'  if(wat>0.001){',
+'    float a=sin(dot(q,vec2(0.024,0.36))-uT*2.7),b=sin(dot(q,vec2(-0.052,0.45))-uT*3.4),c=sin(dot(q,vec2(0.11,0.21))+uT*2.1);',
+'    float n=vn(q*vec2(0.06,0.17)+vec2(uT*0.35,-uT*1.2))-0.5;',
+'    disp+=wat*vec2(a*0.9+c*0.55+n*1.6,b*0.9+n*0.8)*1.15;',
+'    spark=wat*(vn(q*vec2(0.22,0.5)+vec2(uT*1.7,uT*2.9))-0.5);',
+'  }',
+/* grass: gusts roll across the meadow; blades lean and catch the light a little as they bend */
+'  if(grs>0.001){',
+'    float g=vn(q*vec2(0.0019,0.0036)+vec2(uT*0.23,-uT*0.03));',
+'    float gust=smoothstep(0.28,0.92,g);',
+'    float sway=sin(uT*2.1+q.x*0.012+q.y*0.006)*0.35+gust*(1.1+0.35*sin(uT*5.7+q.x*0.05));',
+'    float d=texture2D(uDepth,q/uImg).r;',
+'    disp+=grs*vec2(sway,-abs(sway)*0.25)*(1.0+4.6*d);',
+'    sheen=grs*(gust-0.45)*0.07;',
+'  }',
+'  bool moved=dot(disp,disp)>0.0||q!=p;',
+'  vec3 col=base(moved?(q+disp)*uS+uOff:sc,moved);',
+'  col*=1.0+sheen;',
+'  float lm=dot(col,vec3(0.2126,0.7152,0.0722));',
+'  col+=col*spark*2.6*smoothstep(0.5,0.78,lm);',
+/* clouds drift behind the mountains: add the moved sky, weighted by how much of the pixel is sky */
+'  if(uAmp.x>0.001){',
+'    float w=matteAt(p);',
+'    if(w>0.001){',
+'      vec3 sNew=skyAt(p+billow(p,uT)-vec2(uSkyV*uT,0.0));',
+'      vec3 sOld=skyAt(p+billow(p,0.0));',
+'      col+=w*uAmp.x*(sNew-sOld);',
+'    }',
+'  }',
+'  gl_FragColor=vec4(clamp(col,0.0,1.0),1.0);',
+'}'].join('\n');
+
+/* Our own sheep: drawn from shapes (wool body, neck, head, ears, four legs) so they can really walk and graze */
+var VS_SHEEP = [
+'attribute vec2 aP;',
+'uniform vec2 uRes;uniform float uS;uniform vec2 uOff;uniform vec2 uC;uniform float uL;uniform float uFace;',
+'varying vec2 vL;varying vec2 vI;',
+'void main(){',
+'  vec2 lc=mix(vec2(-0.8,-1.08),vec2(1.02,0.12),aP);',
+'  vec2 ip=uC+vec2(lc.x*uFace,lc.y)*uL;',
+'  vec2 sc=ip*uS+uOff;',
+'  gl_Position=vec4(sc.x/uRes.x*2.0-1.0,1.0-sc.y/uRes.y*2.0,0.0,1.0);',
+'  vL=lc;vI=ip;',
+'}'].join('\n');
+var FS_SHEEP = [
+'precision highp float;',
+'varying vec2 vL;varying vec2 vI;',
+'uniform float uPhase,uWalk,uHead,uNib,uPx,uShadow,uSeed;uniform sampler2D uOcc;uniform vec3 uOccB;',
+'uniform vec3 uHi,uMid,uLo,uDark;',
+'float h12(vec2 p){vec3 q=fract(vec3(p.xyx)*.1031);q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}',
+'float vn(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*(3.0-2.0*f);return mix(mix(h12(i),h12(i+vec2(1.0,0.0)),u.x),mix(h12(i+vec2(0.0,1.0)),h12(i+vec2(1.0,1.0)),u.x),u.y);}',
+'float sdE(vec2 p,vec2 r){float k0=length(p/r);float k1=length(p/(r*r));return k0*(k0-1.0)/max(k1,1e-5);}',
+'float sdLeg(vec2 p,vec2 a,vec2 b,float ra,float rb){vec2 pa=p-a,ba=b-a;float h=clamp(dot(pa,ba)/dot(ba,ba),0.0,1.0);return length(pa-ba*h)-mix(ra,rb,h);}',
+'float smin(float a,float b,float k){float h=clamp(0.5+0.5*(b-a)/k,0.0,1.0);return mix(b,a,h)-k*h*(1.0-h);}',
+'vec4 over(vec4 d,vec3 c,float a){return vec4(c*a+d.rgb*(1.0-a),a+d.a*(1.0-a));}',
+'float cov(float d){return clamp(0.5-d/(uPx*1.5),0.0,1.0);}',
+'void main(){',
+'  vec2 p=vL;',
+/* soft shadow on the grass */
+'  float sh=1.0-smoothstep(0.25,1.0,length((p-vec2(0.02,-0.008))/vec2(0.6,0.06)));',
+'  vec4 o=vec4(0.0,0.0,0.0,sh*uShadow);',
+'  float bob=-0.018*abs(sin(uPhase))*uWalk;',
+'  vec2 bc=vec2(0.0,-0.5+bob);',
+/* legs: diagonal pairs swing together, hooves lift as they come forward */
+'  float legF=1e3,legN=1e3;',
+'  for(int i=0;i<4;i++){',
+'    bool front=i>=2;bool far=(i==1||i==3);',
+'    float xh=(front?0.27:-0.29)+(far?0.06:-0.01);',
+'    float ph=uPhase+((i==0||i==3)?0.0:3.14159);',
+'    float sw=sin(ph)*0.4*uWalk;',
+'    float lift=max(0.0,cos(ph))*0.06*uWalk;',
+'    vec2 a=vec2(xh,bc.y+0.2);',
+'    vec2 b=vec2(xh+sin(sw)*0.31+(front?0.02:-0.02),-lift-0.004);',
+'    float d=sdLeg(p,a,b,far?0.045:0.05,far?0.023:0.027);',
+'    if(far)legF=min(legF,d);else legN=min(legN,d);',
+'  }',
+'  float gr=smoothstep(0.0,-0.065,p.y+(vn(vec2(vI.x*0.3,uSeed))-0.5)*0.035);',
+'  o=over(o,uDark*0.7,cov(legF)*mix(0.2,1.0,gr));',
+/* woolly body: a deep barrel with a round rump and shoulders */
+'  vec2 q=p-bc;',
+'  float body=sdE(q-vec2(0.0,0.0),vec2(0.46,0.24));',
+'  body=smin(body,length(q-vec2(-0.27,-0.05))-0.215,0.1);',
+'  body=smin(body,length(q-vec2(0.24,-0.06))-0.2,0.1);',
+'  body=smin(body,length(q-vec2(-0.06,-0.15))-0.16,0.1);',
+'  body=smin(body,length(q-vec2(0.02,0.07))-0.19,0.12);',
+/* neck down to the grass when grazing, up when looking around */
+'  vec2 nb=bc+vec2(0.31,-0.1);',
+'  vec2 hc=mix(vec2(0.55,-0.085+uNib),vec2(0.58,-0.72),uHead);',
+'  float ang=mix(1.2,0.32,uHead);',
+'  vec2 hq=p-hc;float cs=cos(ang),sn=sin(ang);hq=vec2(cs*hq.x+sn*hq.y,-sn*hq.x+cs*hq.y);',
+'  float neck=sdLeg(p,nb,mix(hc,nb,0.3),0.12,0.08);',
+'  float lumps=vn(q*9.0+uSeed*3.0)*0.028+vn(q*23.0+uSeed*7.0)*0.012;',
+'  float wool=smin(body,neck,0.07)-lumps+0.012;',
+'  wool=smin(wool,length(q-vec2(-0.47,-0.06))-0.06,0.04);',
+'  float n=vn(q*15.0+uSeed*11.0)*0.6+vn(q*34.0+uSeed*5.0)*0.4;',
+'  float tone=smoothstep(0.3,-0.2,q.y);',
+'  float rim=clamp(-wool/0.08,0.0,1.0);',
+'  vec3 wc=tone<0.5?mix(uLo*0.8,uMid*1.02,tone*2.0):mix(uMid*1.02,min(uHi*1.13,vec3(1.0)),tone*2.0-1.0);',
+'  wc*=(0.88+0.2*n)*mix(0.8,1.0,rim)*mix(0.74,1.0,smoothstep(0.24,0.08,q.y))*vec3(1.035,1.0,0.93);',
+'  o=over(o,wc,cov(wool));',
+'  o=over(o,uDark*0.92,cov(legN)*mix(0.2,1.0,gr));',
+/* head: face, darker muzzle, ears */
+'  float head=sdE(hq-vec2(0.02,0.0),vec2(0.115,0.068));',
+'  head=smin(head,sdE(hq-vec2(0.1,0.01),vec2(0.058,0.047)),0.035);',
+'  float ear=sdE(hq-vec2(-0.065,-0.05),vec2(0.058,0.019));',
+'  vec3 face=mix(uLo,uMid,0.62)*(0.86+0.18*smoothstep(0.07,-0.06,hq.y));',
+'  face=mix(face,uLo*0.55,smoothstep(0.07,0.15,hq.x))*mix(0.72,1.0,uHead);',
+'  o=over(o,uLo*0.85,cov(ear));',
+'  o=over(o,face,cov(head));',
+'  float oc=0.0;if(vI.y>=uOccB.x&&vI.y<uOccB.x+uOccB.y)oc=texture2D(uOcc,vec2(vI.x/uOccB.z,(vI.y-uOccB.x)/uOccB.y)).r;',
+'  gl_FragColor=o*(1.0-oc);',
+'}'].join('\n');
+
+/* ---------------- GL plumbing ---------------- */
+var gl, progMain, progDown, progSheep, U = {}, D = {}, SU = {}, tex = {}, imgs = {}, view = null, colorSpace = 'srgb', ready = false;
+var bufTri, bufQuad, sheepCol = COL;
+var ptr = {x: 0, y: 0}, ptrS = {x: 0, y: 0};
+var seed = 20261104; function rnd(){ seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }
+
+function compile(type, src){ var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; }
+function program(vs, fs, names, store){
+  var p = gl.createProgram(); gl.attachShader(p, compile(gl.VERTEX_SHADER, vs)); gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
+  gl.bindAttribLocation(p, 0, 'aP'); gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+  names.forEach(function(n){ store[n] = gl.getUniformLocation(p, n); }); return p;
+}
+function texParams(nearest){ var f = nearest ? gl.NEAREST : gl.LINEAR; gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, f); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, f); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); }
+function upload(src, opts){
+  var tx = gl.createTexture(); gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, tx);
+  gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, !!opts.premul);
+  // data maps are read raw; the photo is read raw too when the canvas itself is Display P3 (the photo's own profile)
+  gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, (opts.data || colorSpace === 'display-p3') ? gl.NONE : gl.BROWSER_DEFAULT_WEBGL);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src); texParams(opts.nearest); return tx;
+}
+function target(w, h){
+  var tx = gl.createTexture(); gl.activeTexture(gl.TEXTURE7); gl.bindTexture(gl.TEXTURE_2D, tx);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null); texParams();
+  var fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tx, 0);
+  if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error('fbo');
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  return {t: tx, fb: fb, w: w, h: h};
+}
+function bind(unit, tx){ gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, tx); }
+function p3ToSrgb(c){
+  var lin = c.map(function(v){ return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); });
+  var m = [[1.2249, -0.2247, 0.0], [-0.0420, 1.0419, 0.0], [-0.0197, -0.0786, 1.0979]];
+  return m.map(function(r){ var v = Math.max(0, Math.min(1, r[0] * lin[0] + r[1] * lin[1] + r[2] * lin[2])); return v <= 0.0031308 ? v * 12.92 : 1.055 * Math.pow(v, 1 / 2.4) - 0.055; });
+}
+
+function initGL(){
+  gl = canvas.getContext('webgl', {alpha: false, antialias: false, depth: false, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: false, powerPreference: 'low-power'});
+  if (!gl) throw new Error('no webgl');
+  var maxT = gl.getParameter(gl.MAX_TEXTURE_SIZE), vp = gl.getParameter(gl.MAX_VIEWPORT_DIMS);
+  if (maxT < IMG_H || vp[1] < IMG_H) throw new Error('texture limit ' + maxT);
+  // The iPhone photo is encoded in Display P3. If this browser can show a WebGL canvas in P3, its pixels go through
+  // untouched (exact colours); otherwise the browser converts them to sRGB on upload, like it would for any page.
+  if (!/[?&]srgb\b/.test(location.search) && 'drawingBufferColorSpace' in gl) { try { gl.drawingBufferColorSpace = 'display-p3'; if (gl.drawingBufferColorSpace === 'display-p3') colorSpace = 'display-p3'; } catch (e) {} }
+  if (colorSpace !== 'display-p3') sheepCol = {hi: p3ToSrgb(COL.hi), mid: p3ToSrgb(COL.mid), lo: p3ToSrgb(COL.lo), dark: p3ToSrgb(COL.dark)};
+  progMain = program(VS, FS, ['uPhoto','uOrig','uMask','uDepth','uSky','uMatte','uRidge','uFill','uFillY','uRes','uS','uOff','uTex','uSkyT','uMatT','uBand','uImg','uT','uOrigOn','uFlockOn','uAmp','uPar','uFocus','uSkyV','uWrap'], U);
+  progDown = program(VS, FS_DOWN, ['uSrc','uPatchTex','uSrcSize','uAxis','uS','uO','uRow0','uLo','uHi','uPatch','uPR'], D);
+  progSheep = program(VS_SHEEP, FS_SHEEP, ['uRes','uS','uOff','uC','uL','uFace','uPhase','uWalk','uHead','uNib','uPx','uShadow','uSeed','uHi','uMid','uLo','uDark','uOcc','uOccB'], SU);
+  bufTri = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, bufTri); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  bufQuad = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, bufQuad); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  tex.src = upload(imgs.photo, {});
+  tex.clean = upload(imgs.clean, {premul: true});
+  tex.mask = upload(imgs.mask, {data: true});
+  tex.depth = upload(imgs.depth, {data: true});
+  tex.matteSrc = upload(imgs.matte, {data: true});
+  tex.ridge = upload(imgs.ridge, {data: true, nearest: true});
+  tex.fill = upload(imgs.fill, {});
+  tex.occ = upload(imgs.occ, {data: true});
+  gl.useProgram(progDown);
+  gl.uniform1i(D.uSrc, 0); gl.uniform1i(D.uPatchTex, 1); gl.uniform4f(D.uPR, CLEAN[0], CLEAN[1], CLEAN[2], CLEAN[3]);
+  gl.useProgram(progMain);
+  gl.uniform1i(U.uPhoto, 0); gl.uniform1i(U.uMask, 1); gl.uniform1i(U.uDepth, 2); gl.uniform1i(U.uOrig, 3);
+  gl.uniform1i(U.uSky, 4); gl.uniform1i(U.uMatte, 5); gl.uniform1i(U.uRidge, 6); gl.uniform1i(U.uFill, 7);
+  gl.uniform2f(U.uFillY, BAND[0], BAND[1] - BAND[0]);
+  gl.uniform2f(U.uImg, IMG_W, IMG_H); gl.uniform1f(U.uSkyV, SKY_V); gl.uniform1f(U.uWrap, WRAP);
+  gl.useProgram(progSheep);
+  gl.uniform3fv(SU.uHi, sheepCol.hi); gl.uniform3fv(SU.uMid, sheepCol.mid); gl.uniform3fv(SU.uLo, sheepCol.lo); gl.uniform3fv(SU.uDark, sheepCol.dark);
+  gl.uniform1f(SU.uShadow, 0.34); gl.uniform1i(SU.uOcc, 6); gl.uniform3f(SU.uOccB, OCC[0], OCC[1] - OCC[0], IMG_W);
+}
+
+/* Separable resample: output texel (i, j) takes the source around ((i + 0.5 + ox) / s, (j + 0.5 + oy) / s) */
+function resample(srcTex, srcW, srcH, outW, outH, s, ox, oy, rowLo, rowHi, patch){
+  gl.useProgram(progDown);
+  gl.bindBuffer(gl.ARRAY_BUFFER, bufTri); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  var mid = target(outW, rowHi - rowLo + 1);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, mid.fb); gl.viewport(0, 0, mid.w, mid.h);
+  bind(0, srcTex); bind(1, tex.clean);
+  gl.uniform2f(D.uSrcSize, srcW, srcH); gl.uniform1f(D.uAxis, 0); gl.uniform1f(D.uS, s); gl.uniform1f(D.uO, ox);
+  gl.uniform1f(D.uRow0, rowLo); gl.uniform1f(D.uLo, 0); gl.uniform1f(D.uHi, srcW - 1); gl.uniform1f(D.uPatch, patch ? 1 : 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  var out = target(outW, outH);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, out.fb); gl.viewport(0, 0, outW, outH);
+  bind(0, mid.t);
+  gl.uniform2f(D.uSrcSize, mid.w, mid.h); gl.uniform1f(D.uAxis, 1); gl.uniform1f(D.uS, s); gl.uniform1f(D.uO, oy);
+  gl.uniform1f(D.uRow0, rowLo); gl.uniform1f(D.uLo, rowLo); gl.uniform1f(D.uHi, rowHi); gl.uniform1f(D.uPatch, 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.deleteTexture(mid.t); gl.deleteFramebuffer(mid.fb); gl.deleteFramebuffer(out.fb);
+  return out.t;
+}
+function rows(y0canvas, y1canvas, oy, s, sup, lo, hi){ return [Math.max(lo, Math.floor((y0canvas - oy) / s - sup)), Math.min(hi, Math.ceil((y1canvas - oy) / s + sup))]; }
+
+/* Size the drawing buffer, use the same framing as CSS cover + 50% 58%, bake everything at that scale */
+function layout(){
+  var cw0 = canvas.clientWidth || innerWidth, ch0 = canvas.clientHeight || innerHeight;
+  var dpr = Math.min(window.devicePixelRatio || 1, Math.sqrt(MAX_PX / (cw0 * ch0)));
+  var cw = Math.max(1, Math.round(cw0 * dpr)), ch = Math.max(1, Math.round(ch0 * dpr));
+  canvas.width = cw; canvas.height = ch;
+  var s = Math.max(cw / IMG_W, ch / IMG_H), ox = Math.round((cw - IMG_W * s) * POS[0]), oy = Math.round((ch - IMG_H * s) * POS[1]);   // browsers snap the <img> to whole pixels too
+  var mg = 48, maxT = gl.getParameter(gl.MAX_TEXTURE_SIZE), sup = 3 / Math.min(s, 1) + 2;
+  // photo, on the canvas pixel grid: with grass where the flock stood, and untouched
+  var X0 = Math.max(Math.floor(ox), -mg), Y0 = Math.max(Math.floor(oy), -mg);
+  var X1 = Math.min(Math.ceil(ox + IMG_W * s), cw + mg), Y1 = Math.min(Math.ceil(oy + IMG_H * s), ch + mg);
+  var tw = Math.min(maxT, X1 - X0), th = Math.min(maxT, Y1 - Y0);
+  var rr = rows(Y0, Y0 + th, oy, s, sup, 0, IMG_H - 1);
+  ['photo', 'orig', 'sky', 'matte'].forEach(function(k){ if (tex[k]) { gl.deleteTexture(tex[k]); tex[k] = null; } });
+  tex.photo = resample(tex.src, IMG_W, IMG_H, tw, th, s, X0 - ox, Y0 - oy, rr[0], rr[1], true);
+  tex.orig = resample(tex.src, IMG_W, IMG_H, tw, th, s, X0 - ox, Y0 - oy, rr[0], rr[1], false);
+  // sky plate: the full width of the photo (clouds scroll in from beyond the screen), visible rows plus room to mirror
+  var PX0 = Math.floor(ox), PY0 = Math.max(Y0, Math.floor(oy + Math.max(0, (Y0 - oy) / s - 520) * s));
+  var skyBot = Math.min(Y0 + th, Math.ceil(oy + (BAND[1] + 4) * s));
+  var sw = Math.min(maxT, Math.ceil(IMG_W * s) + 2), sh = Math.max(1, Math.min(maxT, skyBot - PY0));
+  var skyVisible = skyBot > Math.max(0, Y0) && (BAND[1] * s + oy) > 0;
+  if (skyVisible) {
+    var sr = rows(PY0, PY0 + sh, oy, s, sup, 0, IMG_H - 1);
+    tex.sky = resample(tex.src, IMG_W, IMG_H, sw, sh, s, PX0 - ox, PY0 - oy, sr[0], sr[1], false);
+    var MY0 = Math.max(Y0, Math.floor(oy + BAND[0] * s)), MY1 = Math.min(Y0 + th, Math.ceil(oy + BAND[1] * s));
+    if (MY1 > MY0) {
+      var bh = BAND[1] - BAND[0], mrows = rows(MY0, MY1, oy + BAND[0] * s, s, sup, 0, bh - 1);
+      tex.matte = resample(tex.matteSrc, IMG_W, bh, sw, MY1 - MY0, s, PX0 - ox, MY0 - oy - BAND[0] * s, mrows[0], mrows[1], false);
+    }
+    view = {MY0: MY0, MY1: MY1};
+  }
+  view = Object.assign(view || {}, {cw: cw, ch: ch, s: s, ox: ox, oy: oy, tex: [tw, th], sky: skyVisible});
+  gl.useProgram(progMain);
+  gl.uniform2f(U.uRes, cw, ch); gl.uniform1f(U.uS, s); gl.uniform2f(U.uOff, ox, oy);
+  gl.uniform4f(U.uTex, X0, Y0, tw, th);
+  gl.uniform4f(U.uSkyT, PX0, PY0, sw, sh);
+  if (tex.matte) { gl.uniform4f(U.uMatT, PX0, view.MY0, sw, view.MY1 - view.MY0); gl.uniform2f(U.uBand, view.MY0, view.MY1); }
+  else { var by = oy + BAND[0] * s; gl.uniform2f(U.uBand, by, by); gl.uniform4f(U.uMatT, 0, 0, 1, 1); }
+  gl.uniform2f(U.uFocus, (cw / 2 - ox) / s, (ch / 2 - oy) / s);
+  gl.useProgram(progSheep);
+  gl.uniform2f(SU.uRes, cw, ch); gl.uniform1f(SU.uS, s); gl.uniform2f(SU.uOff, ox, oy);
+}
+
+/* ---------------- our sheep: they wander anywhere in the fenced field, graze, look up, turn ---------------- */
+// A simple ground model fitted to the photo: a sheep is 31 px long by the far fence and ~120 px right behind the near posts.
+var F_PX = SC.camera.f, CX = SC.camera.cx, GH = SC.camera.horizon, GFH = SC.camera.groundScale, BODY = SC.bodyLength;
+function toImg(X, Z){ return {x: CX + F_PX * X / Z, y: GH + GFH / Z, L: F_PX * BODY / Z}; }
+function toGround(x, y){ var Z = GFH / (y - GH); return {X: (x - CX) * Z / F_PX, Z: Z}; }
+var POSTS = SC.posts;
+function fenceY(x){ var a = POSTS[0], b = POSTS[1];
+  if (x > POSTS[1][0]) { a = POSTS[1]; b = POSTS[2]; }
+  return a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]); }
+var FIELD = SC.field;
+function nearZ(x){ return toGround(x, fenceY(x)).Z + FIELD.margin; }
+function inField(X, Z){ var p = toImg(X, Z); return p.x >= FIELD.x0 && p.x <= FIELD.x1 && p.y >= FIELD.y0 && Z >= nearZ(p.x); }
+function randomSpot(){
+  for (var k = 0; k < 30; k++) {
+    var x = FIELD.x0 + rnd() * (FIELD.x1 - FIELD.x0);
+    var yMax = GH + GFH / nearZ(x), y = FIELD.y0 + rnd() * (yMax - FIELD.y0);   // even spread over the picture, near and far
+    var g = toGround(x, y); if (inField(g.X, g.Z)) return g;
+  }
+  return null;
+}
+function clearOf(sh, X, Z){
+  for (var i = 0; i < flock.length; i++) { var o = flock[i]; if (o === sh) continue;
+    var oX = o.state === 'walk' ? o.tX : o.X, oZ = o.state === 'walk' ? o.tZ : o.Z;
+    if (Math.abs(oX - X) < 1.5 && Math.abs(oZ - Z) < 2.4) return false; }
+  return true;
+}
+var flock = [];
+for (var n = 0; n < (sheepOn ? SC.sheepCount : 0); n++) {
+  var g = null;
+  for (var k = 0; k < 40 && !g; k++) { g = randomSpot(); if (g && flock.some(function(o){ return Math.abs(o.X - g.X) < 1.8 && Math.abs(o.Z - g.Z) < 3; })) g = null; }
+  if (!g) continue;
+  var r0 = rnd();
+  flock.push({X: g.X, Z: g.Z, face: rnd() < 0.5 ? -1 : 1, nface: 1, turn: -1, yaw: 0.65 + rnd() * 0.35, yawTo: 1,
+    state: r0 < 0.55 ? 'graze' : 'look', timer: 0.3 + rnd() * 4, phase: rnd() * 6.283, walk: 0, head: r0 < 0.55 ? 0 : 1, headTo: 0,
+    nib: 0, nibT: rnd(), nibbing: false, tX: g.X, tZ: g.Z, speed: 0.5, seed: rnd() * 10});
+}
+function planWalk(sh, small){
+  for (var k = 0; k < 14; k++) {
+    var dX, dZ;
+    if (small) { dX = sh.face * (0.25 + rnd() * 0.35); dZ = (rnd() - 0.5) * 0.3; }
+    else {
+      var d = randomSpot(); if (!d) continue;
+      dX = d.X - sh.X; dZ = d.Z - sh.Z;
+      var D = Math.sqrt(dX * dX + dZ * dZ), step = rnd() < 0.28 ? 4 + rnd() * 12 : 0.8 + rnd() * 3.5;   // mostly short wanders, now and then a long walk
+      if (D > step) { dX *= step / D; dZ *= step / D; }
+      if (Math.abs(dZ) > 2.2 * Math.abs(dX)) dX = (dX === 0 ? sh.face : Math.sign(dX)) * Math.abs(dZ) / 2.2;   // keep walks mostly across the view
+    }
+    var tX = sh.X + dX, tZ = sh.Z + dZ;
+    if (!inField(tX, tZ) || !clearOf(sh, tX, tZ)) continue;
+    sh.tX = tX; sh.tZ = tZ; sh.state = 'walk'; sh.speed = small ? 0.28 : 0.45 + rnd() * 0.35;
+    var len = Math.sqrt(dX * dX + dZ * dZ);
+    sh.yawTo = Math.max(0.5, Math.abs(dX) / Math.max(1e-3, len));      // foreshortened when heading into the distance
+    var want = dX < 0 ? -1 : 1;
+    if (want !== sh.face) { sh.turn = 0; sh.nface = want; }
+    return true;
+  }
+  sh.state = 'graze'; sh.timer = 2 + rnd() * 4; return false;
+}
+function stepFlock(dt){
+  flock.forEach(function(sh){
+    var moving = false;
+    if (sh.turn >= 0) { sh.turn += dt / 0.7; if (sh.turn >= 1) { sh.turn = -1; sh.face = sh.nface; } }
+    if (sh.state === 'graze') {
+      sh.headTo = 0; sh.timer -= dt;
+      sh.nibT -= dt; if (sh.nibT < 0) { sh.nibT = 0.35 + rnd() * 1.4; sh.nibbing = rnd() < 0.7; }
+      if (sh.timer < 0) {
+        var r = rnd();
+        if (r < 0.18) planWalk(sh, true);                                 // a step or two while grazing
+        else if (r < 0.45) { sh.state = 'look'; sh.timer = 1.2 + rnd() * 2.6; }
+        else planWalk(sh, false);
+      }
+    } else if (sh.state === 'look') {
+      sh.headTo = 1; sh.timer -= dt;
+      if (sh.timer < 0) { if (rnd() < 0.6) planWalk(sh, false); else { sh.state = 'graze'; sh.timer = 2.5 + rnd() * 7; } }
+    } else if (sh.state === 'walk') {
+      sh.headTo = 0.58;
+      if (sh.turn < 0) {
+        var dX = sh.tX - sh.X, dZ = sh.tZ - sh.Z, d = Math.sqrt(dX * dX + dZ * dZ);
+        if (d < 0.04) { var r2 = rnd(); sh.state = r2 < 0.35 ? 'look' : 'graze'; sh.timer = sh.state === 'look' ? 1.2 + rnd() * 2.4 : 2.5 + rnd() * 8; }
+        else { var v = sh.speed * Math.min(1, 0.35 + d / 0.6) * Math.min(1, 0.25 + sh.walk); var st = Math.min(d, v * dt); sh.X += dX / d * st; sh.Z += dZ / d * st; moving = true; }
+      }
+    }
+    sh.walk += ((moving ? 1 : 0) - sh.walk) * (1 - Math.exp(-dt * 5));
+    sh.yaw += (sh.yawTo - sh.yaw) * (1 - Math.exp(-dt * 2.5));
+    sh.phase += dt * 6.283 * (sh.speed / 0.9) * sh.walk + (sh.turn >= 0 ? dt * 3 : 0);
+    var hb = sh.state === 'walk' ? Math.sin(sh.phase * 2) * 0.04 * sh.walk : 0;
+    sh.head += (sh.headTo + hb - sh.head) * (1 - Math.exp(-dt * 3.2));
+    var nibTo = sh.state === 'graze' && sh.nibbing ? Math.sin(t * 9 + sh.seed) * 0.018 : 0;
+    sh.nib += (nibTo - sh.nib) * (1 - Math.exp(-dt * 8));
+  });
+}
+function drawFlock(){
+  gl.useProgram(progSheep);
+  gl.bindBuffer(gl.ARRAY_BUFFER, bufQuad); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  bind(6, tex.occ);
+  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+  var order = flock.slice().sort(function(a, b){ return b.Z - a.Z; });   // far ones first
+  var s = view.s;
+  order.forEach(function(sh){
+    var p = toImg(sh.X, sh.Z), f = sh.face * sh.yaw;
+    if (sh.turn >= 0) { var c = Math.cos(Math.PI * sh.turn); f = sh.face * (c < 0 ? -1 : 1) * Math.max(0.45, Math.abs(c)) * sh.yaw; }   // turns through a foreshortened pose
+    var px = 0, py = 0;
+    if (amp.depth > 0.001) { var d = depthAt(p.x, p.y); px = -(parX() * d * amp.depth); py = -(parY() * d * amp.depth); }
+    gl.uniform2f(SU.uC, p.x - px, p.y - py); gl.uniform1f(SU.uL, p.L); gl.uniform1f(SU.uFace, f);
+    gl.uniform1f(SU.uPhase, sh.phase); gl.uniform1f(SU.uWalk, sh.walk); gl.uniform1f(SU.uHead, Math.max(0, Math.min(1, sh.head)));
+    gl.uniform1f(SU.uNib, sh.nib); gl.uniform1f(SU.uPx, 1 / (p.L * s * Math.max(0.3, Math.abs(f)))); gl.uniform1f(SU.uSeed, sh.seed);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  });
+  gl.disable(gl.BLEND);
+}
+var depthPx = null;
+function depthAt(x, y){
+  if (!depthPx) { var c = document.createElement('canvas'); c.width = imgs.depth.width; c.height = imgs.depth.height; var x2 = c.getContext('2d'); x2.drawImage(imgs.depth, 0, 0); depthPx = {w: c.width, h: c.height, d: x2.getImageData(0, 0, c.width, c.height).data}; }
+  var i = Math.min(depthPx.h - 1, Math.round(y / 4)) * depthPx.w + Math.min(depthPx.w - 1, Math.round(x / 4));
+  return depthPx.d[i * 4] / 255;
+}
+function parX(){ return Math.sin(2 * Math.PI * t / 27) * 15 - ptrS.x * 16; }
+function parY(){ return Math.sin(2 * Math.PI * t / 35 + 1.1) * 5 - ptrS.y * 7; }
+
+function draw(){
+  if (!ready) return;
+  gl.useProgram(progMain);
+  gl.bindBuffer(gl.ARRAY_BUFFER, bufTri); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.viewport(0, 0, view.cw, view.ch);
+  bind(0, tex.photo); bind(1, tex.mask); bind(2, tex.depth); bind(3, tex.orig); bind(4, tex.sky || tex.photo); bind(5, tex.matte || tex.photo); bind(6, tex.ridge); bind(7, tex.fill);
+  gl.uniform1f(U.uT, t); gl.uniform1f(U.uOrigOn, holding ? 1 : 0); gl.uniform1f(U.uFlockOn, sheepOn ? 0 : 1);
+  gl.uniform4f(U.uAmp, view.sky ? amp.clouds : 0, amp.water, amp.grass, amp.depth);
+  gl.uniform3f(U.uPar, parX(), parY(), 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  if (!holding && sheepOn) drawFlock();
+}
+function frame(now){
+  raf = requestAnimationFrame(frame);
+  if (!last) last = now;
+  var el = now - last;
+  if (el < 1000 / FPS - 3) return;
+  last = now;
+  var dt = Math.min(0.1, el / 1000);
+  t += dt; stepFlock(dt);
+  var f = 1 - Math.exp(-dt * 1.2);
+  ['clouds', 'water', 'grass'].forEach(function(n){ amp[n] += ((on[n] ? 1 : 0) - amp[n]) * f; });
+  draw();
+  if (!shown) { shown = true; canvas.classList.add('on'); }
+  frames++; fpsT += el; if (fpsT > 1000) { fps = Math.round(frames * 1000 / fpsT); frames = 0; fpsT = 0; }
+}
+
+/* ---------------- lifecycle: only while the daytime photo is on screen ---------------- */
+var want = false, booting = null, failed = false, shown = false;
+function run(){ if (!raf && ready && want && !document.hidden) { last = 0; raf = requestAnimationFrame(frame); } }
+function halt(){ if (raf) { cancelAnimationFrame(raf); raf = 0; } }
+function boot(){
+  if (booting) return booting;
+  var optional = {'depth.png': 1, 'flock-clean.png': 1, 'occ.png': 1};      // a 1-pixel stand-in when a photo doesn't need one
+  function loadOpt(src){ return load(src).catch(function(e){ if (!optional[src]) throw e; var c = document.createElement('canvas'); c.width = c.height = 1; return c; }); }
+  booting = Promise.all(['photo-day.jpg', 'masks.png', 'depth.png', 'flock-clean.png', 'sky-matte.png', 'ridge.png', 'sky-fill.jpg', 'occ.png'].map(loadOpt)).then(function(r){
+    imgs.photo = r[0]; imgs.mask = r[1]; imgs.depth = r[2]; imgs.clean = r[3]; imgs.matte = r[4]; imgs.ridge = r[5]; imgs.fill = r[6]; imgs.occ = r[7];
+    initGL(); layout(); ready = true;
+    canvas.addEventListener('webglcontextlost', function(e){ e.preventDefault(); ready = false; halt(); canvas.classList.remove('on'); shown = false; });
+    canvas.addEventListener('webglcontextrestored', function(){ tex = {}; try { initGL(); layout(); ready = true; run(); } catch (e) {} });
+    run();
+  }).catch(function(err){ failed = true; canvas.classList.remove('on'); try { console.warn('Living photo unavailable:', err && err.message); } catch (e) {} });
+  return booting;
+}
+function scene(name, set){
+  want = !reduce && !failed && name === 'dawn' && set === 'photos';
+  if (want) { boot(); run(); }
+  else { halt(); canvas.classList.remove('on'); shown = false; }
+}
+document.addEventListener('visibilitychange', function(){ if (document.hidden) halt(); else run(); });
+var rT = 0; addEventListener('resize', function(){ clearTimeout(rT); rT = setTimeout(function(){ if (ready) { layout(); if (want) draw(); } }, 160); });
+addEventListener('pointermove', function(e){ if (e.pointerType !== 'mouse') return; ptr.x = (e.clientX / innerWidth - 0.5) * 2; ptr.y = (e.clientY / innerHeight - 0.5) * 2; }, {passive: true});
+window.LIVING = {scene: scene, get fps(){ return fps; }, get running(){ return !!raf; }, get ready(){ return ready; }, flock: flock,
+  renderAt: function(sec, steps){ halt(); want = false; var n = steps || 0, dt = n ? (sec - t) / n : 0; for (var i = 0; i < n; i++) { t += dt; stepFlock(dt); } t = sec; amp.clouds = on.clouds ? 1 : 0; amp.water = on.water ? 1 : 0; amp.grass = on.grass ? 1 : 0; draw(); canvas.classList.add('on'); }};
+})();
+</script>
+<div class="edge t" aria-hidden="true"></div>
+<div class="edge b" aria-hidden="true"></div>
+<h2 class="sr" id="sr">Daily brief</h2>
+<main class="wrap" id="main" role="tabpanel" aria-labelledby="tab-overview"></main>
+<div class="sheet-wrap" id="sheet" hidden>
+  <div class="sheet-scrim" data-close></div>
+  <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-t">
+    <div class="sheet-grab" aria-hidden="true"></div>
+    <header class="sheet-h"><h2 id="sheet-t">Needs you</h2><button class="sheet-x" data-close aria-label="Close"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7l10 10M17 7L7 17"/></svg></button></header>
+    <div class="sheet-b" id="sheet-b"></div>
+  </section>
+</div>
+<nav class="tabbar glass" role="tablist" aria-label="Sections">
+  <span class="lens instant" aria-hidden="true"></span>
+  <button role="tab" id="tab-overview" data-v="overview" aria-selected="true" aria-controls="main"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="2"/><rect x="13" y="4" width="7" height="7" rx="2"/><rect x="4" y="13" width="7" height="7" rx="2"/><rect x="13" y="13" width="7" height="7" rx="2"/></svg><span>Overview</span></button>
+  <button role="tab" id="tab-calls" data-v="calls" aria-selected="false" aria-controls="main" tabindex="-1"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg><span>Calls</span></button>
+  <button role="tab" id="tab-inbox" data-v="inbox" aria-selected="false" aria-controls="main" tabindex="-1"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 13h4.5l1.5 2.5h5l1.5-2.5h4.5"/><path d="M6 5h12l2.5 8v5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2v-5z"/></svg><span>Inbox</span></button>
+  <button role="tab" id="tab-data" data-v="data" aria-selected="false" aria-controls="main" tabindex="-1"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6M4.5 12v6c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-6"/></svg><span>Data</span></button>
+</nav>
+<script>
+const ICONS={
+  cal:'<rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
+  video:'<rect x="3" y="6.5" width="12.5" height="11" rx="2.5"/><path d="M15.5 10.5l5-3v9l-5-3"/>',
+  alertc:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.8v4.7M12 16.2v.1"/>',
+  exclaim:'<path d="M12 6.5v7M12 17.4v.1"/>',
+  eye:'<path d="M2.5 12s3.5-6.5 9.5-6.5 9.5 6.5 9.5 6.5-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>',
+  book:'<path d="M12 6.5C10.5 5.3 8.3 4.8 4 5v13c4.3-.2 6.5.3 8 1.5 1.5-1.2 3.7-1.7 8-1.5V5c-4.3-.2-6.5.3-8 1.5zM12 6.5v13"/>',
+  check:'<path d="M5.5 12.5l4.2 4.2L18.5 8"/>',
+  arrow:'<path d="M8 16L16 8M9.5 8H16v6.5"/>',
+  clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  warn:'<path d="M12 4.5L21 19.5H3z"/><path d="M12 10v4M12 16.8v.1"/>',
+  chev:'<path d="M6.5 9.5l5.5 5.5 5.5-5.5"/>',
+  close:'<path d="M7 7l10 10M17 7L7 17"/>',
+  right:'<path d="M9.5 6.5l5.5 5.5-5.5 5.5"/>'
+};
+const svg=k=>`<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>`;
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const safeUrl=u=>/^https:\/\//i.test(u||'')?u:'';
+
+const TZ=(window.BRIEF_CONFIG&&BRIEF_CONFIG.timeZone)||'Europe/Amsterdam';
+const IB=Object.assign({work:{label:'Work',account:'Outlook'},personal:{label:'Personal',account:'Gmail'}},(window.BRIEF_CONFIG&&BRIEF_CONFIG.inboxes)||{});   // null hides an inbox
+const F=o=>new Intl.DateTimeFormat('en-GB',Object.assign({timeZone:TZ},o));
+const fYMD=new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'});
+const fHM=F({hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+const fLong=F({weekday:'long',day:'numeric',month:'long'});
+const fShort=F({weekday:'short',day:'numeric',month:'short'});
+const fWk=F({weekday:'short'});
+const fHour=F({hour:'numeric',hourCycle:'h23'});
+const ymd=d=>fYMD.format(d), hm=d=>fHM.format(d);
+const toMin=s=>{const m=/^(\d{1,2}):(\d{2})/.exec(s||'');return m?(+m[1])*60+(+m[2]):null};
+const dur=m=>m<60?`${m} min`:(m%60?`${Math.floor(m/60)} h ${m%60} min`:`${m/60} h`);
+const plural=(n,one,many)=>n===1?one:many;
+function isoWeek(ymdStr){
+  const [y,m,d]=ymdStr.split('-').map(Number);const t=new Date(Date.UTC(y,m-1,d));
+  t.setUTCDate(t.getUTCDate()-((t.getUTCDay()+6)%7)+3);
+  const jan4=new Date(Date.UTC(t.getUTCFullYear(),0,4));
+  return 1+Math.round(((t-jan4)/864e5-3+((jan4.getUTCDay()+6)%7))/7);
+}
+
+const B=window.BRIEF;
+const root=document.documentElement;
+const layers={};document.querySelectorAll('.ambient i').forEach(el=>{layers[el.dataset.s]=el});
+function applyScene(s){
+  const cfg=(B.SETS[B.BG_SET]||B.SETS.photos)[s];if(!cfg)return;
+  root.setAttribute('data-scene',s);root.setAttribute('data-tone',cfg.tone);
+  const el=layers[s];
+  if(!el.dataset.loaded){el.style.backgroundImage=`url("${cfg.src}")`;el.style.backgroundPosition=cfg.pos;el.dataset.loaded='1'}
+  Object.values(layers).forEach(x=>x.classList.toggle('on',x===el));
+  if(window.LIVING)LIVING.scene(s,B.BG_SET);   // the daytime photo comes alive; evening and night stay still
+}
+applyScene(root.getAttribute('data-scene')||'dawn');
+
+const state={gmail:null,outlook:null,calendar:null,loaded:{gmail:false,outlook:false,calendar:false},error:null,timedOut:false,view:'overview'};
+let viewing=false;
+let sheetOpen=false,sheetFrom=null;
+const collapsed=(()=>{try{return JSON.parse(localStorage.getItem('brief-collapsed')||'{}')||{}}catch(e){return {}}})();
+const arr=a=>Array.isArray(a)?a:[];
+try{const v=localStorage.getItem('brief-view');if(['overview','calls','inbox','data'].includes(v))state.view=v}catch(e){}
+let ready=false,animateNext=false,lastHTML='',LD={gmail:false,outlook:false,calendar:false};
+
+const main=document.getElementById('main');
+const tabbar=document.querySelector('.tabbar');
+const lens=tabbar.querySelector('.lens');
+const tabs=[...tabbar.querySelectorAll('[role="tab"]')];
+const mqWide=matchMedia('(min-width: 900px)');
+
+function todayEvents(c,today){const d=(c&&Array.isArray(c.days)?c.days:[]).find(d=>d.date===today);return d&&Array.isArray(d.events)?d.events:[]}
+function laterDays(c,today){return (c&&Array.isArray(c.days)?c.days:[]).filter(d=>d.date>today&&Array.isArray(d.events)&&d.events.length)}
+function isLeft(e,nowMin){const end=toMin(e.end)??toMin(e.start);return end==null||end>nowMin}
+function dayShort(d){const t=new Date(d.date+'T12:00:00Z');return isNaN(t)?(d.label||d.date):fWk.format(t)}
+
+function stamp(doc,label){
+  if(!doc||!doc.generatedAt)return '';
+  const g=new Date(doc.generatedAt);if(isNaN(g))return '';
+  const today=ymd(new Date());const when=ymd(g)===today?hm(g):fShort.format(g)+' '+hm(g);
+  return doc.date&&doc.date!==today
+    ?`<span class="stamp stale">Last updated ${esc(when)}</span>`
+    :`<span class="stamp">${esc(label)} ${esc(when)}</span>`;
+}
+const sec=(title,right,body)=>`<section class="sec"><div class="sec-h"><h2>${esc(title)}</h2>${right||''}</div>${body}</section>`;
+const calm=t=>`<div class="card"><div class="row calm"><span class="tile">${svg('check')}</span><div class="r-title">${esc(t)}</div><span></span></div></div>`;
+const empty=t=>`<div class="card"><div class="empty">${esc(t)}</div></div>`;
+const skelRows=n=>`<div class="card">${Array.from({length:n},()=>`<div class="row"><span class="tile ph"></span><div><span class="skel w80"></span><span class="skel w40"></span></div><span></span></div>`).join('')}</div>`;
+
+function hero(g,c,today,nowMin,now,nowHM){
+  const h=+fHour.format(now);
+  const greet=h>=5&&h<12?'Good morning':h>=12&&h<18?'Good afternoon':'Good evening';
+  const parts=[];
+  if(LD.calendar&&c){const n=todayEvents(c,today).filter(e=>isLeft(e,nowMin)).length;parts.push({t:n?`${n} ${plural(n,'call','calls')} left today`:'no calls left today'})}
+  const inboxes=[IB.work&&LD.outlook&&state.outlook,IB.personal&&LD.gmail&&g].filter(Boolean);
+  if(inboxes.length){const k=inboxes.reduce((a,d)=>a+arr(d.needYou).length,0);parts.push(k?{t:`${k} ${plural(k,'thing needs','things need')} you`,open:true}:{t:'nothing needs you'})}
+  if(parts.length)parts[0].t=parts[0].t.charAt(0).toUpperCase()+parts[0].t.slice(1);
+  const s=parts.length?parts.map(p=>p.open?`<button class="sum-link" data-open="needs">${esc(p.t)}</button>`:esc(p.t)).join(' · ')
+    :esc(ready?'Your brief fills in after the morning refresh':'Loading your day…');
+  return `<header class="hero-h"><div class="eyebrow">${esc(fLong.format(now))} · Week ${isoWeek(today)}</div>
+    <time class="clock" role="button" tabindex="0" aria-pressed="${viewing}" title="${viewing?'Back to the brief':'Show the view'}" datetime="${esc(today)}T${esc(nowHM)}">${esc(nowHM)}</time>
+    <h1>${greet}</h1><p class="summary">${s}</p></header>`;
+}
+
+function banner(g,c){
+  let t='';
+  if(state.error)t=state.error;
+  else if(state.timedOut)t=(g||c)?'Still connecting, so this may be out of date.':'Your brief can’t be reached yet. It will appear here as soon as it loads.';
+  return t?`<div class="card banner"><div class="row calm"><span class="tile strong">${svg('exclaim')}</span><div class="r-sub">${esc(t)}</div><span></span></div></div>`:'';
+}
+
+function nextWidget(c,today,nowMin){
+  if(!LD.calendar)return `<div class="card next"><span class="skel w40"></span><span class="skel w80"></span><span class="skel w60"></span></div>`;
+  if(!c)return `<div class="card next"><div class="next-top"><span class="kicker quiet"><i class="dot"></i>Calls</span></div><div class="next-title">No calendar yet</div><div class="next-meta">Your calls appear after the morning refresh.</div></div>`;
+  const ev=todayEvents(c,today);
+  const cur=ev.find(e=>{const s=toMin(e.start),en=toMin(e.end);return s!=null&&s<=nowMin&&(en==null||en>nowMin)});
+  const nxt=ev.find(e=>{const s=toMin(e.start);return s!=null&&s>nowMin});
+  const meta=e=>[e.start&&(e.start+(e.end?'–'+e.end:'')),e.who].filter(Boolean).map(esc).join(' · ');
+  if(cur){
+    const s=toMin(cur.start),en=toMin(cur.end);const pct=en>s?Math.round((nowMin-s)/(en-s)*100):0;
+    return `<div class="card next"><div class="next-top"><span class="kicker live"><i class="dot"></i>Now</span>${en!=null?`<span class="when">ends in ${esc(dur(Math.max(1,en-nowMin)))}</span>`:''}</div>
+      <div class="next-title">${esc(cur.title||'Untitled')}</div><div class="next-meta">${meta(cur)}</div>
+      <div class="progress"><span data-pct="${Math.max(0,Math.min(100,pct))}"></span></div>
+      ${nxt?`<div class="then">Then <b>${esc(nxt.start)}</b> · ${esc(nxt.title||'')}</div>`:''}</div>`;
+  }
+  if(nxt){
+    const d=toMin(nxt.start)-nowMin;
+    return `<div class="card next"><div class="next-top"><span class="kicker"><i class="dot"></i>Up next</span><span class="when">${d<=1?'starting now':'in '+esc(dur(d))}</span></div>
+      <div class="next-title">${esc(nxt.title||'Untitled')}</div><div class="next-meta">${meta(nxt)}</div></div>`;
+  }
+  const later=laterDays(c,today)[0];
+  if(later){
+    const e=later.events[0];
+    return `<div class="card next"><div class="next-top"><span class="kicker"><i class="dot"></i>Next call</span><span class="when">${esc(dayShort(later))} ${esc(e.start||'')}</span></div>
+      <div class="next-title">${esc(e.title||'Untitled')}</div><div class="next-meta">${esc(e.who||'')}</div>
+      <div class="then">${ev.length?'No more calls today':'No calls today'}</div></div>`;
+  }
+  return `<div class="card next"><div class="next-top"><span class="kicker quiet"><i class="dot"></i>Calls</span></div><div class="next-title">Nothing scheduled</div><div class="next-meta">No calls through Sunday.</div></div>`;
+}
+
+function stats(g,c,today,nowMin){
+  const tile=(icon,n,lbl,loaded,act)=>{
+    const inner=`<span class="ico">${svg(icon)}</span>${loaded?`<div class="num">${esc(n)}</div>`:'<span class="skel num"></span>'}<div class="lbl">${esc(lbl)}</div>`;
+    return loaded&&act?`<button class="card stat" ${act}><span class="go" aria-hidden="true">${svg('right')}</span>${inner}</button>`:`<div class="card stat">${inner}</div>`;
+  };
+  const o=state.outlook;
+  const need=(g||o)?arr(g&&g.needYou).length+arr(o&&o.needYou).length:'–';
+  const left=c?todayEvents(c,today).filter(e=>isLeft(e,nowMin)).length:'–';
+  const week=c?(c.days||[]).filter(d=>d.date>=today).reduce((n,d)=>n+((d.events||[]).length),0):'–';
+  return tile('alertc',need,'Need you',LD.gmail&&LD.outlook,`data-open="needs" aria-label="${esc(need)} need you: show them"`)
+    +tile('video',left,'Calls left',LD.calendar&&c,`data-go="calls" aria-label="${esc(left)} calls left today: open Calls"`)
+    +tile('cal',week,'This week',LD.calendar&&c,`data-go="calls" aria-label="${esc(week)} calls this week: open Calls"`);
+}
+
+function callRow(e,isToday,nowMin){
+  const s=toMin(e.start),en=toMin(e.end);
+  const past=isToday&&en!=null&&en<=nowMin;
+  const now=isToday&&s!=null&&s<=nowMin&&(en==null||en>nowMin);
+  const cls=['call',past&&'past',now&&'now',e.tentative&&'tent'].filter(Boolean).join(' ');
+  const flags=(now?'<span class="badge now">Now</span>':'')+(e.tentative?'<span class="badge tent">Tentative</span>':'');
+  return `<div class="${cls}"><div class="c-time">${esc(e.start||'')}${e.end?`<small>${esc(e.end)}</small>`:''}</div><div class="c-bar"></div>
+    <div><div class="c-title">${esc(e.title||'Untitled')}</div>${e.who?`<div class="c-who">${esc(e.who)}</div>`:''}${flags?`<div class="c-flags">${flags}</div>`:''}
+    ${e.overlapsWith?`<div class="overlap">${svg('warn')}Overlaps with ${esc(e.overlapsWith)}</div>`:''}</div></div>`;
+}
+function todaySection(c,today,nowMin,nowHM){
+  let body;
+  if(!LD.calendar)body=skelRows(3);
+  else if(!c)body=empty('Your calls appear here after the morning refresh.');
+  else{
+    const ev=todayEvents(c,today);
+    if(!ev.length)body=calm('No calls today');
+    else{
+      const line=`<div class="nowline" aria-label="Now ${esc(nowHM)}"><b>${esc(nowHM)}</b><i></i></div>`;
+      let rows='',placed=false;
+      ev.forEach(e=>{const s=toMin(e.start);if(!placed&&s!=null&&s>nowMin){rows+=line;placed=true}rows+=callRow(e,true,nowMin)});
+      if(!placed)rows+=line;
+      body=`<div class="card">${rows}</div>`;
+    }
+  }
+  return sec('Today',stamp(c,'Updated'),body);
+}
+function weekSection(c,today){
+  if(!LD.calendar||!c)return '';
+  const days=laterDays(c,today);
+  const body=days.length?days.map((d,i)=>`<div class="day-h${i?'':' first'}">${esc(d.label||d.date)}</div><div class="card">${d.events.map(e=>callRow(e,false)).join('')}</div>`).join(''):empty('Nothing else through Sunday.');
+  return sec('Later this week','',body);
+}
+
+function mailRow(x,icon,strong,account){
+  const meta=[x.sender,x.time].filter(Boolean).map(esc).join(' · ');
+  const u=safeUrl(x.url);const sub=x.action||x.why;
+  return `<div class="row"><span class="tile${strong?' strong':''}">${svg(icon)}</span><div>
+    <div class="r-title">${esc(x.title||'')}</div>${sub?`<div class="r-sub">${esc(sub)}</div>`:''}
+    ${x.deadline?`<div class="deadline">${svg('clock')}<span>${esc(x.deadline)}</span></div>`:''}
+    ${(meta||x.source)?`<div class="r-meta">${x.source?`<span class="badge">${esc(x.source)}</span>`:''}${meta?`<span>${meta}</span>`:''}</div>`:''}</div>
+    ${u?`<a class="btn" href="${esc(u)}" target="_blank" rel="noopener noreferrer" aria-label="Open in ${esc(account||'mail')}: ${esc(x.title||'')}">Open${svg('arrow')}</a>`:'<span></span>'}</div>`;
+}
+/* One block per inbox: Work (Outlook) and Personal (Gmail) */
+function inboxBlock(doc,loaded,title,account,emptyMsg,key){
+  const closed=!!collapsed[key];
+  const counts=()=>{
+    if(!loaded)return '';if(!doc)return 'nothing yet';
+    const n=arr(doc.needYou).length,w=arr(doc.worthLook).length,r=arr(doc.worthReading).length;
+    const bits=[n?`<b>${n} need${n===1?'s':''} you</b>`:'nothing needs you'];if(w)bits.push(`${w} to look at`);if(r)bits.push(`${r} to read`);
+    return bits.join(' · ');
+  };
+  const block=(right,body)=>`<section class="sec ib${closed?' closed':''}" data-ib="${key}"><div class="sec-h">
+    <h2 class="ib-head"><button class="ib-toggle" aria-expanded="${!closed}" aria-controls="ib-${key}">${svg('chev').replace('class="i"','class="i chev"')}<span>${esc(title)}</span><span class="acct">${esc(account)}</span><span class="ib-sum">${counts()}</span></button></h2>${right||''}</div>
+    <div class="ib-body" id="ib-${key}"><div class="ib-in">${body}</div></div></section>`;
+  if(!loaded)return block('',skelRows(2));
+  if(!doc)return block('',empty(emptyMsg));
+  const n=arr(doc.needYou),w=arr(doc.worthLook),r=arr(doc.worthReading),s=arr(doc.skipped);
+  const grp=t=>`<div class="grp">${esc(t)}</div>`;
+  let h=n.length?grp('Needs you')+n.map(x=>mailRow(x,'exclaim',true,account)).join('')
+    :`<div class="row calm"><span class="tile">${svg('check')}</span><div class="r-title">Nothing needs you</div><span></span></div>`;
+  if(w.length)h+=grp('Worth a look')+w.map(x=>mailRow(x,'eye',false,account)).join('');
+  if(r.length)h+=grp('Worth reading')+r.map(x=>mailRow(x,'book',false,account)).join('');
+  if(s.length){const total=s.reduce((a,x)=>a+(+x.count||0),0);
+    h+=grp(`Skipped · ${total}`)+`<div class="chips">${s.map(x=>`<span class="chip"><b>${esc(x.count)}</b>${esc(x.label)}</span>`).join('')}</div>`}
+  return block(stamp(doc,'Updated'),`<div class="card">${h}</div>`);
+}
+
+function render(){
+  const now=new Date(),today=ymd(now),nowHM=hm(now),nowMin=toMin(nowHM);
+  const sc=B.sceneAt(now);if(sc!==root.getAttribute('data-scene'))applyScene(sc);
+  const g=state.gmail,c=state.calendar;
+  LD={gmail:ready&&state.loaded.gmail,outlook:ready&&state.loaded.outlook,calendar:ready&&state.loaded.calendar};
+  const S={
+    today:()=>todaySection(c,today,nowMin,nowHM),
+    week:()=>weekSection(c,today),
+    work:()=>inboxBlock(state.outlook,LD.outlook,IB.work.label,IB.work.account,`Your ${IB.work.account} inbox appears here after the morning refresh.`,'work'),
+    personal:()=>inboxBlock(g,LD.gmail,IB.personal.label,IB.personal.account,`Your ${IB.personal.account} digest appears here after the morning refresh.`,'personal')
+  };
+  const wide=mqWide.matches;
+  const layouts={
+    overview:wide?[['today','week'],['work','personal']]:[['work','today','personal','week']],
+    calls:wide?[['today'],['week']]:[['today','week']],
+    inbox:wide?[['work'],['personal']]:[['work','personal']]
+  };
+  let html=hero(g,c,today,nowMin,now,nowHM)+banner(g,c);
+  if(state.view==='data'){html+=dataView()}
+  else{
+    const L=(layouts[state.view]||layouts.overview).map(col=>col.filter(k=>IB[k]!==null)).filter(col=>col.length);
+    html+=`<div class="top">${nextWidget(c,today,nowMin)}${stats(g,c,today,nowMin)}</div>`;
+    const cols=L.map(col=>col.map(k=>S[k]()).join(''));
+    html+=L.length>1?`<div class="cols">${cols.map(x=>`<div>${x}</div>`).join('')}</div>`:cols[0];
+  }
+  html+=`<p class="foot">${state.demo?'Example data. Set it up in Claude to see your own.':'Refreshes automatically every morning'}</p>`;
+  if(html!==lastHTML){
+    main.classList.toggle('anim',animateNext);
+    main.innerHTML=html;lastHTML=html;
+    if(animateNext){let i=0;main.querySelectorAll('.hero-h,.card,.sec-h,.day-h').forEach(el=>{el.style.animationDelay=Math.min(i++,14)*28+'ms'})}
+    animateNext=false;
+    main.querySelectorAll('[data-pct]').forEach(el=>{el.style.width=el.dataset.pct+'%'});
+  }
+  const sum=main.querySelector('.summary');
+  document.getElementById('sr').textContent='Daily brief. '+(sum?sum.textContent:'');
+  if(sheetOpen)fillSheet();
+}
+
+/* Data view: the three raw entries in the page's database, as the morning task wrote them */
+function hlJSON(json){
+  return esc(json).replace(/(&quot;(?:(?!&quot;).)*&quot;(\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?)/g,m=>{
+    const c=m.startsWith('&quot;')?(/:$/.test(m)?'k':'s'):'n';return `<span class="${c}">${m}</span>`;});
+}
+function dataView(){
+  const shortUrl=(k,v)=>typeof v==='string'&&/^https?:/.test(v)&&v.length>64?v.slice(0,60)+'…':v;
+  const cards=['outlook','gmail','calendar'].map(k=>{
+    const d=state[k];const loaded=LD[k];
+    const head=`<div class="dv-h"><code>brief/${k}</code>${d?stamp(d,'Written'):''}${d?`<button class="btn dv-copy" data-k="${k}">Copy</button>`:''}</div>`;
+    const body=!loaded?'<div class="dv-empty"><span class="skel w80"></span><span class="skel w60"></span></div>'
+      :d?`<pre class="dv-json">${hlJSON(JSON.stringify(d,shortUrl,2))}</pre>`:'<div class="dv-empty">Empty until the next morning refresh writes it.</div>';
+    return `<div class="card">${head}${body}</div>`;
+  }).join('');
+  return sec('Database',`<span class="stamp">collection brief · 3 entries</span>`,`<div class="dv">${cards}</div>`);
+}
+/* Needs-you sheet: everything waiting on you, from both inboxes, with a way into each email */
+const sheet=document.getElementById('sheet'),sheetB=document.getElementById('sheet-b'),sheetT=document.getElementById('sheet-t');
+function fillSheet(){
+  const src=[IB.work&&[IB.work.label,IB.work.account,state.outlook,LD.outlook],IB.personal&&[IB.personal.label,IB.personal.account,state.gmail,LD.gmail]].filter(Boolean);
+  const total=src.reduce((a,x)=>a+(x[2]?arr(x[2].needYou).length:0),0);
+  sheetT.innerHTML=`Needs you<small>${total}</small>`;
+  let h='';
+  src.forEach(([label,acct,doc,loaded])=>{
+    const n=doc?arr(doc.needYou):[];
+    h+=`<div class="grp">${esc(label)}<span class="acct">${esc(acct)}</span></div>`;
+    h+=!loaded?'<div class="row"><span class="tile ph"></span><div><span class="skel w80"></span><span class="skel w40"></span></div><span></span></div>'
+      :n.length?n.map(x=>mailRow(x,'exclaim',true,acct)).join('')
+      :`<div class="row calm"><span class="tile">${svg('check')}</span><div class="r-sub">Nothing here needs you</div><span></span></div>`;
+  });
+  h+=`<div class="sheet-f"><button class="btn" data-go="inbox">See the full inboxes${svg('right')}</button></div>`;
+  sheetB.innerHTML=h;
+}
+function openSheet(from){
+  if(sheetOpen)return;
+  sheetOpen=true;sheetFrom=from||document.activeElement;fillSheet();
+  sheet.hidden=false;root.classList.add('locked');
+  requestAnimationFrame(()=>requestAnimationFrame(()=>sheet.classList.add('open')));
+  setTimeout(()=>{const x=sheet.querySelector('.sheet-x');if(x)x.focus({preventScroll:true})},60);
+}
+function closeSheet(){
+  if(!sheetOpen)return;
+  sheetOpen=false;sheet.classList.remove('open');root.classList.remove('locked');
+  const done=()=>{if(!sheetOpen)sheet.hidden=true};
+  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduced)done();else setTimeout(done,420);
+  if(sheetFrom&&document.contains(sheetFrom))sheetFrom.focus({preventScroll:true});
+}
+sheet.addEventListener('click',e=>{
+  if(e.target.closest('[data-close]'))closeSheet();
+  const go=e.target.closest('[data-go]');if(go){closeSheet();setView(go.dataset.go)}
+});
+sheet.addEventListener('keydown',e=>{
+  if(e.key!=='Tab')return;                                   // keep keyboard focus inside the sheet
+  const f=[...sheet.querySelectorAll('button,a[href]')].filter(el=>!el.disabled&&el.offsetParent!==null);if(!f.length)return;
+  const a=f[0],z=f[f.length-1];
+  if(e.shiftKey&&document.activeElement===a){e.preventDefault();z.focus()}else if(!e.shiftKey&&document.activeElement===z){e.preventDefault();a.focus()}
+});
+/* On the phone the sheet can be swiped down to close, like a native sheet */
+(()=>{
+  const panel=sheet.querySelector('.sheet'),scrim=sheet.querySelector('.sheet-scrim'),wideSheet=matchMedia('(min-width:900px)');
+  let on=false,moved=false,y0=0,dy=0,lastY=0,lastT=0,v=0;
+  const reset=()=>{panel.style.transition=panel.style.transform=scrim.style.transition=scrim.style.opacity=''};
+  panel.addEventListener('touchstart',e=>{
+    if(wideSheet.matches||e.touches.length!==1)return;
+    if(e.target.closest('.sheet-b')&&sheetB.scrollTop>0)return;      // the list scrolls back up first
+    on=true;moved=false;dy=v=0;y0=lastY=e.touches[0].clientY;lastT=e.timeStamp;
+  },{passive:true});
+  panel.addEventListener('touchmove',e=>{
+    if(!on)return;
+    const y=e.touches[0].clientY,d=y-y0;
+    if(!moved){if(Math.abs(d)<6)return;if(d<0){on=false;return}moved=true;panel.style.transition=scrim.style.transition='none'}
+    e.preventDefault();
+    dy=Math.max(0,d);const dt=e.timeStamp-lastT;if(dt>0)v=(y-lastY)/dt;lastY=y;lastT=e.timeStamp;
+    panel.style.transform=`translateY(${dy}px)`;scrim.style.opacity=String(Math.max(0,1-dy/(panel.offsetHeight||1)));
+  },{passive:false});
+  const end=()=>{
+    if(!on)return;on=false;if(!moved)return;moved=false;
+    reset();if(dy>110||(dy>30&&v>.5))closeSheet();                  // otherwise it springs back
+  };
+  panel.addEventListener('touchend',end);panel.addEventListener('touchcancel',end);
+})();
+main.addEventListener('click',e=>{
+  const o=e.target.closest('[data-open="needs"]');if(o){openSheet(o);return}
+  const g=e.target.closest('[data-go]');if(g){setView(g.dataset.go);return}
+  const t=e.target.closest('.ib-toggle');
+  if(t){const sec=t.closest('.ib'),k=sec.dataset.ib,cl=!sec.classList.contains('closed');
+    collapsed[k]=cl;try{localStorage.setItem('brief-collapsed',JSON.stringify(collapsed))}catch(err){}
+    sec.classList.toggle('closed',cl);t.setAttribute('aria-expanded',String(!cl));lastHTML='';}
+});
+function setViewing(v){viewing=v;document.body.classList.toggle('viewing',v);const c=main.querySelector('.clock');if(c){c.setAttribute('aria-pressed',String(v));c.title=v?'Back to the brief':'Show the view'}}
+main.addEventListener('click',e=>{if(e.target.closest('.clock'))setViewing(!viewing)});
+main.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.closest('.clock')){e.preventDefault();setViewing(!viewing)}});
+document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(sheetOpen){closeSheet();return}if(viewing)setViewing(false)});
+main.addEventListener('click',async e=>{
+  const b=e.target.closest('.dv-copy');if(!b)return;
+  try{await navigator.clipboard.writeText(JSON.stringify(state[b.dataset.k],null,2));b.textContent='Copied'}
+  catch(err){b.textContent='Copy failed'}
+  setTimeout(()=>{b.textContent='Copy'},1600);
+});
+
+/* Re-render exactly on each new minute, so the clock and the now-line stay true */
+function scheduleTick(){clearTimeout(scheduleTick.t);scheduleTick.t=setTimeout(()=>{render();scheduleTick()},60000-(Date.now()%60000)+40)}
+
+function placeLens(move){
+  const b=tabs.find(t=>t.getAttribute('aria-selected')==='true');if(!b)return;
+  lens.style.width=b.offsetWidth+'px';
+  lens.style.transform=`translateX(${b.offsetLeft}px)`;
+  if(move){lens.classList.add('moving');clearTimeout(placeLens.t);placeLens.t=setTimeout(()=>lens.classList.remove('moving'),220)}
+}
+function setView(v,focus){
+  state.view=v;try{localStorage.setItem('brief-view',v)}catch(e){}
+  tabs.forEach(t=>{const on=t.dataset.v===v;t.setAttribute('aria-selected',String(on));t.tabIndex=on?0:-1;if(on&&focus)t.focus()});
+  main.setAttribute('aria-labelledby','tab-'+v);
+  placeLens(true);animateNext=ready;render();window.scrollTo(0,0);
+}
+tabs.forEach((t,i)=>{
+  t.addEventListener('click',()=>{if(state.view===t.dataset.v){window.scrollTo({top:0,behavior:'smooth'});return}setView(t.dataset.v)});
+  t.addEventListener('keydown',e=>{
+    const k=e.key;let j=null;
+    if(k==='ArrowRight')j=(i+1)%tabs.length;else if(k==='ArrowLeft')j=(i-1+tabs.length)%tabs.length;else if(k==='Home')j=0;else if(k==='End')j=tabs.length-1;
+    if(j!=null){e.preventDefault();setView(tabs[j].dataset.v,true)}
+  });
+});
+tabs.forEach(t=>{const on=t.dataset.v===state.view;t.setAttribute('aria-selected',String(on));t.tabIndex=on?0:-1});
+main.setAttribute('aria-labelledby','tab-'+state.view);
+placeLens(false);
+requestAnimationFrame(()=>requestAnimationFrame(()=>lens.classList.remove('instant')));
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>placeLens(false));
+addEventListener('resize',()=>placeLens(false));
+mqWide.addEventListener('change',()=>{placeLens(false);render()});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){render();scheduleTick()}});
+render();scheduleTick();
+
+function maybeReady(){
+  if(!ready&&((state.loaded.gmail&&state.loaded.outlook&&state.loaded.calendar)||state.timedOut||state.error)){ready=true;animateNext=true}
+}
+(async()=>{
+  let db=null;
+  try{if(typeof claude!=='undefined'&&claude&&typeof claude.use==='function')db=await claude.use('db')}catch(e){db=null}
+  if(!db){
+    // Opened outside Claude (on your computer, or GitHub Pages): show the example data, moved to today
+    try{
+      const r=await fetch('example-data.json',{cache:'no-store'});if(!r.ok)throw 0;
+      const demo=await r.json(),today=ymd(new Date()),day0=demo['brief/calendar'].date;
+      const shift=d=>{const [y,m,dd]=d.split('-').map(Number),[y0,m0,d0]=day0.split('-').map(Number),[y1,m1,d1]=today.split('-').map(Number);
+        const t=new Date(Date.UTC(y,m-1,dd)+(Date.UTC(y1,m1-1,d1)-Date.UTC(y0,m0-1,d0)));return t.toISOString().slice(0,10)};
+      const stamp=new Date(Date.now()-36e5).toISOString();
+      for(const k of ['gmail','outlook','calendar']){const d=JSON.parse(JSON.stringify(demo['brief/'+k]));d.date=today;d.generatedAt=stamp;
+        if(d.days)d.days.forEach((x,i)=>{x.date=shift(x.date);const L=fLong.format(new Date(x.date+'T12:00:00Z'));x.label=i===0?'Today · '+L:L});
+        state[k]=d;state.loaded[k]=true}
+      state.demo=true;maybeReady();render();return;
+    }catch(e){}
+    state.error='Sign in to claude.ai to see your brief.';maybeReady();render();return
+  }
+  const fresh={gmail:false,outlook:false,calendar:false};
+  const timer=setTimeout(()=>{state.timedOut=true;maybeReady();render()},10000);
+  const sub=k=>db.doc('brief/'+k).onSnapshot(s=>{
+    state[k]=s.exists?s.data():null;state.loaded[k]=true;
+    if(!s.metadata.fromCache){fresh[k]=true;if(fresh.gmail&&fresh.outlook&&fresh.calendar){clearTimeout(timer);state.timedOut=false}}
+    maybeReady();render();
+  },()=>{state.loaded[k]=true;state.error='Your brief couldn’t be loaded on this visit.';clearTimeout(timer);maybeReady();render()});
+  sub('gmail');sub('outlook');sub('calendar');
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,192 @@
+{
+  "brief/calendar": {
+    "date": "2026-11-04",
+    "generatedAt": "2026-11-04T07:19:00Z",
+    "days": [
+      {
+        "date": "2026-11-04",
+        "label": "Today · Wednesday 4 November",
+        "events": [
+          {
+            "start": "09:30",
+            "end": "10:00",
+            "title": "Portfolio check-in",
+            "who": "Sophie, Mark, Lena · Video call",
+            "tentative": false
+          },
+          {
+            "start": "13:00",
+            "end": "13:45",
+            "title": "Lunch with Sam",
+            "who": "Sam Visser",
+            "tentative": false
+          },
+          {
+            "start": "15:00",
+            "end": "15:45",
+            "title": "Founder intro: Kestrel Labs",
+            "who": "Noor Bakker · Video call",
+            "tentative": false
+          }
+        ]
+      },
+      {
+        "date": "2026-11-05",
+        "label": "Thursday 5 November",
+        "events": [
+          {
+            "start": "10:00",
+            "end": "10:30",
+            "title": "Weekly team sync",
+            "who": "Team · Video call",
+            "tentative": false
+          },
+          {
+            "start": "16:00",
+            "end": "17:00",
+            "title": "Market map review",
+            "who": "Mark, Lena",
+            "tentative": false
+          }
+        ]
+      },
+      {
+        "date": "2026-11-06",
+        "label": "Friday 6 November",
+        "events": [
+          {
+            "start": "11:00",
+            "end": "11:45",
+            "title": "Week reflection",
+            "who": "Personal",
+            "tentative": false
+          },
+          {
+            "start": "17:30",
+            "end": "19:00",
+            "title": "Friday drinks",
+            "who": "Team",
+            "tentative": true
+          }
+        ]
+      }
+    ]
+  },
+  "brief/outlook": {
+    "date": "2026-11-04",
+    "generatedAt": "2026-11-04T07:19:00Z",
+    "needYou": [
+      {
+        "title": "Kestrel Labs: sign the NDA before Friday",
+        "action": "Review the NDA and sign it before the founder call.",
+        "sender": "Noor Bakker",
+        "time": "08:12",
+        "url": "https://mail.example.com/work/1"
+      }
+    ],
+    "worthLook": [
+      {
+        "title": "Q4 portfolio review: draft agenda",
+        "action": "Add your two discussion points by Thursday.",
+        "sender": "Mark Peters",
+        "time": "Tue 17:20",
+        "url": "https://mail.example.com/work/2"
+      },
+      {
+        "title": "Intro request: a climate-tech founder",
+        "action": "Reply if you want the intro.",
+        "sender": "Lena Novak",
+        "time": "07:55",
+        "url": "https://mail.example.com/work/3"
+      },
+      {
+        "title": "October data export is ready",
+        "action": "Check the export before the review.",
+        "sender": "Data team",
+        "time": "Tue 18:02",
+        "url": "https://mail.example.com/work/4"
+      }
+    ],
+    "worthReading": [
+      {
+        "title": "What AI agents change in due diligence",
+        "why": "A short essay on agents in investment work.",
+        "source": "Weekly AI letter",
+        "url": "https://mail.example.com/work/5"
+      },
+      {
+        "title": "European growth rounds in Q3",
+        "why": "Round sizes and valuations by sector.",
+        "source": "Market notes",
+        "url": "https://mail.example.com/work/6"
+      }
+    ],
+    "skipped": [
+      {
+        "label": "newsletters",
+        "count": 4
+      },
+      {
+        "label": "calendar notices",
+        "count": 3
+      },
+      {
+        "label": "sign-in links",
+        "count": 2
+      },
+      {
+        "label": "promotions",
+        "count": 2
+      }
+    ]
+  },
+  "brief/gmail": {
+    "date": "2026-11-04",
+    "generatedAt": "2026-11-04T07:19:00Z",
+    "needYou": [
+      {
+        "title": "Dentist: confirm Thursday's appointment",
+        "action": "Reply yes, or pick another time.",
+        "deadline": "Confirm before today 18:00",
+        "sender": "City Dental",
+        "time": "Tue 19:10",
+        "url": "https://mail.example.com/home/1"
+      }
+    ],
+    "worthLook": [
+      {
+        "title": "Your train tickets to Hamburg",
+        "action": "Download the tickets before Friday.",
+        "sender": "Rail tickets",
+        "time": "07:40",
+        "url": "https://mail.example.com/home/2"
+      }
+    ],
+    "worthReading": [
+      {
+        "title": "Running club: the November routes",
+        "why": "New Sunday route and start times.",
+        "source": "Running club",
+        "url": "https://mail.example.com/home/3"
+      }
+    ],
+    "skipped": [
+      {
+        "label": "newsletters",
+        "count": 6
+      },
+      {
+        "label": "promotions",
+        "count": 5
+      },
+      {
+        "label": "social updates",
+        "count": 3
+      },
+      {
+        "label": "orders and deliveries",
+        "count": 2
+      }
+    ]
+  }
+}

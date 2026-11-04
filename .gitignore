@@ -1,0 +1,7 @@
+# outputs of the background tools
+*.npy
+preview-*.png
+preview-*.jpg
+depth_anything_v2_vits.onnx
+__pycache__/
+.DS_Store
