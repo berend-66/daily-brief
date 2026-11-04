@@ -14,6 +14,8 @@
                'ink'     painted landscapes, no photos and no animation
    inboxes     how each inbox is labelled; set one to null to hide it (Outlook → brief/outlook,
                Gmail → brief/gmail, as the scheduled task writes them)
+   alwaysDay   true: the living daytime photo shows day and night, so the sheep are always out;
+               false: the evening and night photos take over around sunset (photos only)
    scene       optional: the numbers that belong to your own daytime photo, once you
                bring it to life (see background/README.md). Leave it out for the sheep. */
 window.BRIEF_CONFIG = {
@@ -21,6 +23,7 @@ window.BRIEF_CONFIG = {
   latitude: 52.37,
   longitude: 4.90,
   background: 'photos',
+  alwaysDay: true,
   inboxes: {
     work:     { label: 'Work',     account: 'Outlook' },
     personal: { label: 'Personal', account: 'Gmail' }
@@ -58,7 +61,9 @@ window.BRIEF_CONFIG = {
   }
   var TZ0 = CFG.timeZone || 'Europe/Amsterdam';
   var ymdF = new Intl.DateTimeFormat('en-CA',{timeZone:TZ0,year:'numeric',month:'2-digit',day:'2-digit'});
+  var ALWAYS_DAY = CFG.alwaysDay !== false && BG_SET === 'photos';   /* see alwaysDay in BRIEF_CONFIG */
   function sceneAt(now){
+    if(ALWAYS_DAY) return 'dawn';
     try{
       var p=ymdF.format(now).split('-').map(Number), t=sunTimes(new Date(Date.UTC(p[0],p[1]-1,p[2],12))), ms=now.getTime(), H=36e5;
       if(!isFinite(t.rise)||!isFinite(t.set)) throw 0;
@@ -177,6 +182,10 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 #main>*{transition:opacity .55s var(--ease),transform .55s var(--ease)}
 body.viewing #main>*:not(.hero-h){opacity:0;transform:translateY(10px);pointer-events:none}
 body.viewing .edge{opacity:0}
+/* In the view you can pick the sheep up: the page holds still under your finger */
+body.viewing{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+html.sheep-hover{cursor:grab}
+html.sheep-grab,html.sheep-grab *{cursor:grabbing!important}
 
 .wrap{max-width:620px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 26px) calc(env(safe-area-inset-right) + 16px) calc(env(safe-area-inset-bottom) + 124px) calc(env(safe-area-inset-left) + 16px)}
 
@@ -335,9 +344,30 @@ h1{font:700 26px/1.2 var(--font-display);letter-spacing:-.024em;margin:0 0 3px}
 .edge.t{top:0;height:calc(env(safe-area-inset-top) + 34px);background:linear-gradient(var(--edge),transparent);-webkit-mask-image:linear-gradient(#000 35%,transparent);mask-image:linear-gradient(#000 35%,transparent)}
 .edge.b{bottom:0;height:calc(env(safe-area-inset-bottom) + 100px);background:linear-gradient(transparent,var(--edge));-webkit-mask-image:linear-gradient(transparent,#000 65%);mask-image:linear-gradient(transparent,#000 65%)}
 
-/* Motion: each surface animates itself, so its glass keeps sampling the picture */
-@keyframes rise{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:none}}
-.anim .hero-h,.anim .card,.anim .sec-h,.anim .day-h{animation:rise .65s var(--ease) both}
+/* Motion: each surface animates itself, so its glass keeps sampling the picture.
+   Switching tabs: the old view fades up and out, then the new one rises in, card by card. */
+@keyframes rise{from{opacity:0;transform:translateY(10px) scale(.99)}to{opacity:1;transform:none}}
+@keyframes leave{to{opacity:0;transform:translateY(-6px) scale(.995)}}
+.anim .card,.anim .sec-h,.anim .day-h,.anim .foot,.anim.hero-in .hero-h{animation:rise .62s var(--ease) backwards}
+#main .leaving{animation:leave .2s cubic-bezier(.4,0,1,1) forwards!important;pointer-events:none}
+
+/* Sign off: tick a row when it's handled; it folds away into Done */
+.tick{appearance:none;border:0;background:none;padding:0;margin:-2px 0 0;width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:var(--inv);cursor:pointer;position:relative;font:inherit;-webkit-tap-highlight-color:transparent}
+.tick::before{content:"";position:absolute;inset:5px;border-radius:50%;box-shadow:inset 0 0 0 1.75px var(--label3);transition:box-shadow .25s var(--ease),background-color .25s var(--ease),transform .4s var(--spring)}
+.tick.need::before{box-shadow:inset 0 0 0 2.25px var(--label)}
+.tick svg.i{position:relative;width:15px;height:15px;stroke-width:2.8;stroke-dasharray:20;stroke-dashoffset:20;transition:stroke-dashoffset .28s var(--ease)}
+.tick:active::before{transform:scale(.86)}
+.tick[aria-pressed="true"]::before{background:var(--label);box-shadow:inset 0 0 0 1px var(--label);animation:pop .42s var(--spring)}
+.tick[aria-pressed="true"] svg.i{stroke-dashoffset:0;transition-delay:.06s}
+@media (hover:hover){.tick:not([aria-pressed="true"]):hover svg.i{stroke-dashoffset:0;color:var(--label3)}}
+.tick:focus-visible{outline:2px solid var(--label);outline-offset:-1px}
+@keyframes pop{0%{transform:scale(.72)}55%{transform:scale(1.12)}100%{transform:scale(1)}}
+.r-title{transition:color .3s var(--ease)}
+.row.done .r-title{color:var(--label2);text-decoration:line-through;text-decoration-thickness:1.5px;text-decoration-color:var(--label3)}
+.row.done .r-sub,.row.done .r-meta,.row.done .deadline{opacity:.55;transition:opacity .3s var(--ease)}
+.row.done .btn{opacity:.75}
+.row.fresh{animation:rowin .42s var(--ease) backwards}
+@keyframes rowin{from{opacity:0;transform:translateY(-4px)}}
 
 /* Wide screens: iPad/Mac pattern, tab bar floats at the top */
 .cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px;align-items:start}
@@ -581,13 +611,18 @@ var FS = [
 '}'].join('\n');
 
 /* Our own sheep: drawn from shapes (wool body, neck, head, ears, four legs) so they can really walk and graze */
+/* Each sheep is drawn about a pivot (its feet on the grass; its scruff while you hold it; its middle in the air),
+   turned by uRot and squashed by uSq, so the same shapes can stand, hang, fly and land. */
 var VS_SHEEP = [
 'attribute vec2 aP;',
 'uniform vec2 uRes;uniform float uS;uniform vec2 uOff;uniform vec2 uC;uniform float uL;uniform float uFace;',
+'uniform vec2 uPiv;uniform float uRot;uniform vec2 uSq;',
 'varying vec2 vL;varying vec2 vI;',
 'void main(){',
-'  vec2 lc=mix(vec2(-0.8,-1.08),vec2(1.02,0.12),aP);',
-'  vec2 ip=uC+vec2(lc.x*uFace,lc.y)*uL;',
+'  vec2 lc=mix(vec2(-0.9,-1.12),vec2(1.1,0.24),aP);',
+'  vec2 d=vec2((lc.x-uPiv.x)*uFace,lc.y-uPiv.y)*uSq*uL;',
+'  float c=cos(uRot),s=sin(uRot);',
+'  vec2 ip=uC+vec2(c*d.x-s*d.y,s*d.x+c*d.y);',
 '  vec2 sc=ip*uS+uOff;',
 '  gl_Position=vec4(sc.x/uRes.x*2.0-1.0,1.0-sc.y/uRes.y*2.0,0.0,1.0);',
 '  vL=lc;vI=ip;',
@@ -595,7 +630,7 @@ var VS_SHEEP = [
 var FS_SHEEP = [
 'precision highp float;',
 'varying vec2 vL;varying vec2 vI;',
-'uniform float uPhase,uWalk,uHead,uNib,uPx,uShadow,uSeed;uniform sampler2D uOcc;uniform vec3 uOccB;',
+'uniform float uPhase,uWalk,uHead,uNib,uPx,uShadow,uSeed,uMode,uHang,uCrouch,uOccA;uniform vec4 uLegA;uniform sampler2D uOcc;uniform vec3 uOccB;',
 'uniform vec3 uHi,uMid,uLo,uDark;',
 'float h12(vec2 p){vec3 q=fract(vec3(p.xyx)*.1031);q+=dot(q,q.yzx+33.33);return fract((q.x+q.y)*q.z);}',
 'float vn(vec2 p){vec2 i=floor(p),f=fract(p);vec2 u=f*f*(3.0-2.0*f);return mix(mix(h12(i),h12(i+vec2(1.0,0.0)),u.x),mix(h12(i+vec2(0.0,1.0)),h12(i+vec2(1.0,1.0)),u.x),u.y);}',
@@ -606,12 +641,13 @@ var FS_SHEEP = [
 'float cov(float d){return clamp(0.5-d/(uPx*1.5),0.0,1.0);}',
 'void main(){',
 '  vec2 p=vL;',
-/* soft shadow on the grass */
-'  float sh=1.0-smoothstep(0.25,1.0,length((p-vec2(0.02,-0.008))/vec2(0.6,0.06)));',
-'  vec4 o=vec4(0.0,0.0,0.0,sh*uShadow);',
+'  float oc=0.0;if(vI.y>=uOccB.x&&vI.y<uOccB.x+uOccB.y)oc=texture2D(uOcc,vec2(vI.x/uOccB.z,(vI.y-uOccB.x)/uOccB.y)).r;',
+/* first pass: the soft shadow on the grass (it stays on the ground when the sheep is lifted) */
+'  if(uMode>0.5){float sh=1.0-smoothstep(0.25,1.0,length((p-vec2(0.02,-0.008))/vec2(0.6,0.06)));gl_FragColor=vec4(0.0,0.0,0.0,sh*uShadow)*(1.0-oc);return;}',
+'  vec4 o=vec4(0.0);',
 '  float bob=-0.018*abs(sin(uPhase))*uWalk;',
-'  vec2 bc=vec2(0.0,-0.5+bob);',
-/* legs: diagonal pairs swing together, hooves lift as they come forward */
+'  vec2 bc=vec2(0.0,-0.5+bob+uCrouch*0.07);',
+/* legs: diagonal pairs swing together, hooves lift as they come forward; held or flying, each leg dangles at its own angle */
 '  float legF=1e3,legN=1e3;',
 '  for(int i=0;i<4;i++){',
 '    bool front=i>=2;bool far=(i==1||i==3);',
@@ -621,10 +657,12 @@ var FS_SHEEP = [
 '    float lift=max(0.0,cos(ph))*0.06*uWalk;',
 '    vec2 a=vec2(xh,bc.y+0.2);',
 '    vec2 b=vec2(xh+sin(sw)*0.31+(front?0.02:-0.02),-lift-0.004);',
+'    float an=i==0?uLegA.x:(i==1?uLegA.y:(i==2?uLegA.z:uLegA.w));',
+'    b=mix(b,a+0.305*vec2(sin(an),cos(an)),uHang);',
 '    float d=sdLeg(p,a,b,far?0.045:0.05,far?0.023:0.027);',
 '    if(far)legF=min(legF,d);else legN=min(legN,d);',
 '  }',
-'  float gr=smoothstep(0.0,-0.065,p.y+(vn(vec2(vI.x*0.3,uSeed))-0.5)*0.035);',
+'  float gr=mix(smoothstep(0.0,-0.065,p.y+(vn(vec2(vI.x*0.3,uSeed))-0.5)*0.035),1.0,uHang);',
 '  o=over(o,uDark*0.7,cov(legF)*mix(0.2,1.0,gr));',
 /* woolly body: a deep barrel with a round rump and shoulders */
 '  vec2 q=p-bc;',
@@ -657,8 +695,7 @@ var FS_SHEEP = [
 '  face=mix(face,uLo*0.55,smoothstep(0.07,0.15,hq.x))*mix(0.72,1.0,uHead);',
 '  o=over(o,uLo*0.85,cov(ear));',
 '  o=over(o,face,cov(head));',
-'  float oc=0.0;if(vI.y>=uOccB.x&&vI.y<uOccB.x+uOccB.y)oc=texture2D(uOcc,vec2(vI.x/uOccB.z,(vI.y-uOccB.x)/uOccB.y)).r;',
-'  gl_FragColor=o*(1.0-oc);',
+'  gl_FragColor=o*(1.0-oc*uOccA);',      /* fence posts and weeds stay in front, unless the sheep is in your hand */
 '}'].join('\n');
 
 /* ---------------- GL plumbing ---------------- */
@@ -708,7 +745,7 @@ function initGL(){
   if (colorSpace !== 'display-p3') sheepCol = {hi: p3ToSrgb(COL.hi), mid: p3ToSrgb(COL.mid), lo: p3ToSrgb(COL.lo), dark: p3ToSrgb(COL.dark)};
   progMain = program(VS, FS, ['uPhoto','uOrig','uMask','uDepth','uSky','uMatte','uRidge','uFill','uFillY','uRes','uS','uOff','uTex','uSkyT','uMatT','uBand','uImg','uT','uOrigOn','uFlockOn','uAmp','uPar','uFocus','uSkyV','uWrap'], U);
   progDown = program(VS, FS_DOWN, ['uSrc','uPatchTex','uSrcSize','uAxis','uS','uO','uRow0','uLo','uHi','uPatch','uPR'], D);
-  progSheep = program(VS_SHEEP, FS_SHEEP, ['uRes','uS','uOff','uC','uL','uFace','uPhase','uWalk','uHead','uNib','uPx','uShadow','uSeed','uHi','uMid','uLo','uDark','uOcc','uOccB'], SU);
+  progSheep = program(VS_SHEEP, FS_SHEEP, ['uRes','uS','uOff','uC','uL','uFace','uPiv','uRot','uSq','uPhase','uWalk','uHead','uNib','uPx','uShadow','uSeed','uMode','uHang','uCrouch','uOccA','uLegA','uHi','uMid','uLo','uDark','uOcc','uOccB'], SU);
   bufTri = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, bufTri); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
   bufQuad = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, bufQuad); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1]), gl.STATIC_DRAW);
   gl.enableVertexAttribArray(0);
@@ -857,6 +894,7 @@ function planWalk(sh, small){
 }
 function stepFlock(dt){
   flock.forEach(function(sh){
+    if (sh.p) { stepPlay(sh, dt); return; }                              // in your hand, in the air or landing
     var moving = false;
     if (sh.turn >= 0) { sh.turn += dt / 0.7; if (sh.turn >= 1) { sh.turn = -1; sh.face = sh.nface; } }
     if (sh.state === 'graze') {
@@ -888,21 +926,194 @@ function stepFlock(dt){
     sh.nib += (nibTo - sh.nib) * (1 - Math.exp(-dt * 8));
   });
 }
+/* ---------------- play: pick a sheep up and it hangs from its scruff ----------------
+   Held, its body swings as a pendulum driven by your finger, and each leg dangles as its own pendulum, kicking now and then.
+   Let go, or flick it, and it flies, twists its feet back under itself, lands with a bounce and a squash, looks around and
+   grazes again. On a phone it works in the view (tap the clock), so it never gets in the way of scrolling; with a mouse,
+   wherever a sheep shows between the cards. */
+// Gravity is doubled, as desktop pets do (eSheep's is about five times real), so drops and swings feel quick on a small screen.
+var GRAV = 2 * 9.81, HC = GFH / F_PX, LEGM = 0.305 * BODY, COMH = 0.47 * BODY;   // HC: camera height of the ground model (m)
+var PS = [0.02, -0.72], PC = [0.04, -0.47];                // scruff and centre of mass, in body lengths from the feet
+var HIPX = [-0.30, -0.23, 0.26, 0.33], HIPY = -0.3;        // back near, back far, front near, front far (as in the shader)
+var KP = 1.85;                                             // m·d/I of the body hanging from its scruff: one swing in ~1.5 s
+var LEGPH = [0, Math.PI, Math.PI, 0];                      // kicks go in diagonal pairs, like a trot
+var drag = null, lastDrop = 0;
+function pxm(Z){ return F_PX / Z; }                        // image px per metre at depth Z
+function faceOf(sh){
+  var f = sh.face * sh.yaw;
+  if (sh.turn >= 0) { var c = Math.cos(Math.PI * sh.turn); f = sh.face * (c < 0 ? -1 : 1) * Math.max(0.45, Math.abs(c)) * sh.yaw; }   // turns through a foreshortened pose
+  return f;
+}
+// where and how to draw a sheep: pivot point in the picture, which point of the sheep it is, turn, squash, legs
+function pose(sh, anchor){
+  var p = sh.p, f = faceOf(sh);
+  if (!p) { var g = toImg(sh.X, sh.Z); return {C: g, piv: [0, 0], rot: 0, sq: [1, 1], L: g.L, f: f, hang: 0, crouch: 0}; }
+  var L = F_PX * BODY / p.Z, sy = 1 - 0.16 * p.sq, sq = [p.zoom / sy, p.zoom * sy];          // squash and stretch keep its volume
+  // held: drawn exactly under your finger; the physics follows a smoothed copy of that point (the anchor)
+  if (p.mode === 'held') return {C: anchor ? {x: p.Sx, y: p.Sy} : {x: p.Rx, y: p.Ry}, piv: PS, rot: -p.th, sq: sq, L: L, f: f, hang: p.hang, crouch: 0};
+  var k = pxm(p.Z), cy = p.mode === 'land' ? GH + GFH / p.Z + PC[1] * sq[1] * L : GH + (HC - p.Y) * k;   // landed: feet stay planted
+  return {C: {x: CX + p.X * k, y: cy}, piv: PC, rot: -p.th, sq: sq, L: L, f: f, hang: p.hang, crouch: p.crouch};
+}
+function at(ps, lx, ly){                                   // a point of the sheep (body lengths from its feet) in image px
+  var dx = (lx - ps.piv[0]) * ps.f * ps.sq[0] * ps.L, dy = (ly - ps.piv[1]) * ps.sq[1] * ps.L, c = Math.cos(ps.rot), s = Math.sin(ps.rot);
+  return {x: ps.C.x + c * dx - s * dy, y: ps.C.y + s * dx + c * dy};
+}
+function grab(sh, pt, touch, e){
+  var p = sh.p;
+  if (!p) {
+    var ps0 = pose(sh), s0 = at(ps0, PS[0], PS[1]);
+    p = sh.p = {mode: 'held', Sx: s0.x, Sy: s0.y, Rx: s0.x, Ry: s0.y, Svx: 0, Svy: 0, X: 0, Y: 0, Z: sh.Z, vx: 0, vy: 0, th: 0, w: 0, t: 0,
+      legs: HIPX.map(function(){ return {a: 0, v: 0, px: null}; }), hang: 0, zoom: 1, zv: 0, sq: 0, sqv: 0, crouch: 0, cv: 0, lift: 0,
+      kick: 0, rest: 1.5 + rnd() * 2, kt: rnd() * 6.28};
+  } else if (p.mode !== 'held') {                          // caught on the way down: carry on at the speed it had
+    var ps = pose(sh), s = at(ps, PS[0], PS[1]), c = at(ps, PC[0], PC[1]), k = pxm(p.Z);
+    p.Svx = p.vx * k - p.w * (c.y - s.y); p.Svy = -p.vy * k + p.w * (c.x - s.x);
+    p.Sx = p.Rx = s.x; p.Sy = p.Ry = s.y; p.mode = 'held'; p.lift = 0;
+  }
+  if (sh.turn >= 0) { sh.turn = -1; sh.face = sh.nface; }
+  sh.state = 'held';
+  p.legs.forEach(function(l){ l.px = null; });
+  p.kick = Math.max(p.kick, 0.6 + rnd() * 0.6);            // a startled kick when it leaves the ground
+  drag = {sh: sh, id: e.pointerId, touch: touch, x: pt.x, y: pt.y, ox: p.Rx - pt.x, oy: p.Ry - pt.y,
+    up: (touch ? 30 : 10) * pt.k / view.s,                 // lifted clear of your fingertip
+    css: view.s / pt.k,                                    // image px to CSS px
+    samples: [{t: e.timeStamp, x: pt.x, y: pt.y}]};
+}
+function letGo(v){
+  var sh = drag.sh, p = sh.p; drag = null; lastDrop = performance.now();
+  if (!p || p.mode !== 'held') return;
+  var ps = pose(sh), c = at(ps, PC[0], PC[1]), k = pxm(p.Z), rx = c.x - p.Rx, ry = c.y - p.Ry;
+  // your flick (zero if your finger had stopped), plus the swing it already had
+  var vx = ((v ? v.x : 0) + p.w * ry) / k * 0.85, vy = -((v ? v.y : 0) - p.w * rx) / k * 0.85, sp = Math.sqrt(vx * vx + vy * vy);
+  if (sp > 12) { vx *= 12 / sp; vy *= 12 / sp; }           // a hard toss goes about three and a half metres up
+  p.mode = 'fly'; p.X = (c.x - CX) / k; p.Y = HC - (c.y - GH) / k; p.vx = vx; p.vy = vy; p.lift = 0;
+  if (p.Y < COMH + 0.05) p.vy = Math.max(p.vy, Math.sqrt(2 * GRAV * (COMH - p.Y + 0.3)));   // let go in front of the fence: it hops back over
+  p.dir = Math.abs(vx) > 1.5 ? (vx < 0 ? -1 : 1) : 0;      // thrown sideways: once down, it turns to face the way it flew
+}
+function stepPlay(sh, dt){
+  var p = sh.p, n = Math.max(1, Math.ceil(dt * 240)), h = dt / n;
+  sh.head += (1 - sh.head) * (1 - Math.exp(-dt * 6));      // head up: what is happening?
+  sh.yaw += (1 - sh.yaw) * (1 - Math.exp(-dt * 3));
+  sh.walk += (0 - sh.walk) * (1 - Math.exp(-dt * 8)); sh.nib = 0;
+  if (p.mode === 'held') { if (p.kick > 0) p.kick -= dt; else if ((p.rest -= dt) < 0) { p.kick = 0.45 + rnd() * 0.7; p.rest = 1.8 + rnd() * 3.4; } }
+  else p.kick = Math.max(0, p.kick - dt);
+  for (var i = 0; i < n; i++) {
+    p.t += h;
+    // shared springs: the pick-up zoom, and the squash and crouch of a landing
+    var zt = p.mode === 'held' ? 1.1 : 1;
+    p.zv += (260 * (zt - p.zoom) - 30 * p.zv) * h; p.zoom += p.zv * h;
+    p.sqv += (-300 * p.sq - 16 * p.sqv) * h; p.sq = Math.max(-0.5, Math.min(1.1, p.sq + p.sqv * h));
+    p.cv += (-180 * p.crouch - 20 * p.cv) * h; p.crouch = Math.max(-0.2, Math.min(1.2, p.crouch + p.cv * h));
+    var land = p.mode === 'land';
+    p.hang += ((land ? 0 : 1) - p.hang) * (1 - Math.exp(-h * (land ? 16 : 10)));
+    if (p.mode === 'held') stepHeld(p, h); else if (p.mode === 'fly') stepFly(p, h); else if (stepLand(sh, p, h)) return;
+    stepLegs(sh, p, h);
+  }
+}
+function stepHeld(p, h){
+  p.lift += (1 - p.lift) * (1 - Math.exp(-h * 9));
+  var up = drag ? drag.up * p.lift : 0;
+  if (drag) { p.Rx = drag.x + drag.ox; p.Ry = drag.y + drag.oy - up; }   // pinned under your finger, no smoothing, no lag
+  // the physics anchor follows that point on a critically damped spring, which gives the swing a smooth acceleration to work with
+  var W = 30, ax = W * W * (p.Rx - p.Sx) - 2 * W * p.Svx, ay = W * W * (p.Ry - p.Sy) - 2 * W * p.Svy;
+  p.Svx += ax * h; p.Svy += ay * h; p.Sx += p.Svx * h; p.Sy += p.Svy * h;
+  // depth: dragging across the field carries it there (the patch of grass under it follows your finger), but a quick flick up
+  // only lifts it, and above the field or in front of the fence it keeps its distance
+  var Z = p.Z, gy = 0;
+  for (var j = 0; j < 2; j++) { gy = p.Ry + up + 0.72 * p.zoom * F_PX * BODY / Z; Z = GFH / Math.max(6, gy - GH); }
+  var gx = Math.max(FIELD.x0, Math.min(FIELD.x1, p.Rx)), Zt = Math.max(nearZ(gx), Z);
+  var flickUp = Zt > p.Z && p.Svy * (drag ? drag.css : 1) < -240;      // moving up faster than 240 CSS px/s
+  if (gy >= FIELD.y0 && gy <= fenceY(gx) && !flickUp) p.Z += (Zt - p.Z) * (1 - Math.exp(-h * 14));
+  // the body swings about the scruff: a pendulum driven by the scruff's acceleration
+  var k = pxm(p.Z), axm = ax / k, aym = ay / k, am = Math.sqrt(axm * axm + aym * aym);
+  if (am > 14) { axm *= 14 / am; aym *= 14 / am; }
+  if (am > 24 && p.kick <= 0) p.kick = 0.35 + rnd() * 0.4;          // shaken: it protests
+  p.w += (KP * (-axm * Math.cos(p.th) - (GRAV - aym) * Math.sin(p.th)) - 1.9 * p.w) * h;
+  p.th += p.w * h;
+  if (p.th > 1.45) { p.th = 1.45; p.w = Math.min(p.w, 0) * 0.5; } else if (p.th < -1.45) { p.th = -1.45; p.w = Math.max(p.w, 0) * 0.5; }
+}
+function sides(p){ var k = pxm(p.Z); return [(FIELD.x0 - CX) / k, (FIELD.x1 - CX) / k]; }   // the side fences, in metres at its depth
+function stepFly(p, h){
+  p.vy -= GRAV * h; p.vx *= 1 - 0.2 * h;
+  p.X += p.vx * h; p.Y += p.vy * h;
+  var x = sides(p);
+  if (p.X < x[0]) { p.X = x[0]; p.vx = Math.abs(p.vx) * 0.3; } else if (p.X > x[1]) { p.X = x[1]; p.vx = -Math.abs(p.vx) * 0.3; }
+  p.w += (-150 * p.th - 24 * p.w) * h; p.th += p.w * h;    // twists its feet back under itself, like a cat (critically damped)
+  if (p.Y <= COMH && p.vy < 0) {                           // touch down
+    var v = -p.vy;
+    p.sqv += v * 1.1; p.cv += v * 1.4; p.Y = COMH; p.vx *= 0.55; p.w *= 0.4;
+    if (v > 1.5) p.vy = v * 0.24;                          // a small bounce: sheep are soft
+    else { p.vy = 0; p.mode = 'land'; p.t = 0; }
+  }
+}
+function stepLand(sh, p, h){
+  p.vx *= Math.exp(-h * 8); p.X += p.vx * h;
+  var x = sides(p); p.X = Math.max(x[0], Math.min(x[1], p.X));
+  p.w += (-70 * p.th - 14 * p.w) * h; p.th += p.w * h;
+  if (p.t < 0.5 || Math.abs(p.vx) > 0.06 || Math.abs(p.th) > 0.03 || Math.abs(p.sq) > 0.04 || Math.abs(p.crouch) > 0.04 || p.hang > 0.05 || Math.abs(p.zoom - 1) > 0.01) return false;
+  // back on its feet: hand it back to the flock, a little startled
+  sh.X = p.X - PC[0] * faceOf(sh) * BODY; sh.Z = Math.max(p.Z, nearZ(toImg(sh.X, p.Z).x)); sh.p = null; sh.walk = 0;
+  if (inField(sh.X, sh.Z) && clearOf(sh, sh.X, sh.Z)) {
+    sh.state = 'look'; sh.timer = 1.4 + rnd() * 2.2;
+    if (p.dir && p.dir !== sh.face && sh.turn < 0) { sh.turn = 0; sh.nface = p.dir; }
+  } else if (!planWalk(sh, false)) { sh.state = 'look'; sh.timer = 1.5; }
+  return true;
+}
+// each leg is a rod hanging from its hip: gravity, the hip's own acceleration, joint friction, joint limits and, now and then, a kick
+function stepLegs(sh, p, h){
+  var ps = pose(sh, true), k = pxm(p.Z), fs = ps.f < 0 ? -1 : 1, kicking = p.kick > 0 && p.mode === 'held';
+  p.kt += h * 13;
+  for (var i = 0; i < 4; i++) {
+    var l = p.legs[i], hp = at(ps, HIPX[i], HIPY + ps.crouch * 0.07);
+    if (l.px === null) { l.px = hp.x; l.py = hp.y; l.vx = 0; l.vy = 0; continue; }
+    var vx = (hp.x - l.px) / h, vy = (hp.y - l.py) / h, ax = (vx - l.vx) / h / k, ay = (vy - l.vy) / h / k;
+    l.px = hp.x; l.py = hp.y; l.vx = vx; l.vy = vy;
+    var am = Math.sqrt(ax * ax + ay * ay); if (am > 22) { ax *= 22 / am; ay *= 22 / am; }
+    var rel = fs * (l.a - p.th), lo = i < 2 ? -0.9 : -0.45, hi = i < 2 ? 0.45 : 0.9;
+    var want = kicking ? 0.5 * Math.sin(p.kt + LEGPH[i]) + (i < 2 ? -0.12 : 0.12) : (p.mode === 'fly' ? 0 : 0.05);
+    var km = kicking ? 90 : (p.mode === 'fly' ? 30 : 6);
+    var acc = 1.5 / LEGM * (-ax * Math.cos(l.a) - (GRAV - ay) * Math.sin(l.a)) + fs * km * (want - rel) - 4 * (l.v - p.w);
+    if (rel < lo) acc += fs * 900 * (lo - rel) - 14 * (l.v - p.w); else if (rel > hi) acc -= fs * 900 * (rel - hi) + 14 * (l.v - p.w);
+    l.v += acc * h; l.a += l.v * h;
+    rel = fs * (l.a - p.th);                               // hips only bend so far
+    if (rel < lo - 0.2) { l.a = p.th + fs * (lo - 0.2); l.v = p.w; } else if (rel > hi + 0.2) { l.a = p.th + fs * (hi + 0.2); l.v = p.w; }
+  }
+}
+function busy(){ if (drag) return true; for (var i = 0; i < flock.length; i++) if (flock[i].p) return true; return false; }
+
 function drawFlock(){
   gl.useProgram(progSheep);
   gl.bindBuffer(gl.ARRAY_BUFFER, bufQuad); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
   bind(6, tex.occ);
   gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-  var order = flock.slice().sort(function(a, b){ return b.Z - a.Z; });   // far ones first
-  var s = view.s;
-  order.forEach(function(sh){
-    var p = toImg(sh.X, sh.Z), f = sh.face * sh.yaw;
-    if (sh.turn >= 0) { var c = Math.cos(Math.PI * sh.turn); f = sh.face * (c < 0 ? -1 : 1) * Math.max(0.45, Math.abs(c)) * sh.yaw; }   // turns through a foreshortened pose
-    var px = 0, py = 0;
-    if (amp.depth > 0.001) { var d = depthAt(p.x, p.y); px = -(parX() * d * amp.depth); py = -(parY() * d * amp.depth); }
-    gl.uniform2f(SU.uC, p.x - px, p.y - py); gl.uniform1f(SU.uL, p.L); gl.uniform1f(SU.uFace, f);
+  var s = view.s, P = flock.map(pose);
+  function par(x, y){ if (amp.depth <= 0.001) return [0, 0]; var d = depthAt(x, y); return [parX() * d * amp.depth, parY() * d * amp.depth]; }
+  // shadows first, on the grass under each sheep: a lifted sheep's shadow stays down, lighter and wider the higher it goes
+  gl.uniform1f(SU.uMode, 1); gl.uniform1f(SU.uOccA, 1); gl.uniform2f(SU.uPiv, 0, 0); gl.uniform1f(SU.uRot, 0); gl.uniform1f(SU.uHang, 0);
+  flock.forEach(function(sh, i){
+    var ps = P[i], g, hgt = 0;
+    if (sh.p) { var k = pxm(sh.p.Z), c = at(ps, PC[0], PC[1]); g = toImg((c.x - CX) / k, sh.p.Z); hgt = Math.max(0, HC - (c.y - GH) / k - COMH); }
+    else g = toImg(sh.X, sh.Z);
+    var sc = 1 + Math.min(0.5, hgt * 0.22), o = par(g.x, g.y);
+    gl.uniform2f(SU.uC, g.x - o[0], g.y - o[1]); gl.uniform1f(SU.uL, g.L); gl.uniform1f(SU.uFace, ps.f); gl.uniform2f(SU.uSq, sc, sc);
+    gl.uniform1f(SU.uShadow, 0.34 * Math.max(0.15, 1 - hgt / 2.2)); gl.uniform1f(SU.uPx, 1 / (g.L * sc * s * Math.max(0.3, Math.abs(ps.f))));
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  });
+  // then the sheep, far ones first, and the one in your hand (or in the air) on top
+  gl.uniform1f(SU.uMode, 0);
+  var order = flock.map(function(sh, i){ return i; }).sort(function(a, b){
+    var A = flock[a], B = flock[b], ta = A.p && A.p.mode !== 'land' ? 1 : 0, tb = B.p && B.p.mode !== 'land' ? 1 : 0;
+    return ta !== tb ? ta - tb : (B.p ? B.p.Z : B.Z) - (A.p ? A.p.Z : A.Z);
+  });
+  order.forEach(function(i){
+    var sh = flock[i], ps = P[i], p = sh.p, o = par(ps.C.x, ps.C.y);
+    gl.uniform2f(SU.uC, ps.C.x - o[0], ps.C.y - o[1]); gl.uniform1f(SU.uL, ps.L); gl.uniform1f(SU.uFace, ps.f);
+    gl.uniform2f(SU.uPiv, ps.piv[0], ps.piv[1]); gl.uniform1f(SU.uRot, ps.rot); gl.uniform2f(SU.uSq, ps.sq[0], ps.sq[1]);
+    gl.uniform1f(SU.uHang, ps.hang); gl.uniform1f(SU.uCrouch, ps.crouch); gl.uniform1f(SU.uOccA, p ? 1 - Math.min(1, p.hang * 1.5) : 1);
+    if (p) { var fs = ps.f < 0 ? -1 : 1; gl.uniform4f(SU.uLegA, fs * (p.legs[0].a - p.th), fs * (p.legs[1].a - p.th), fs * (p.legs[2].a - p.th), fs * (p.legs[3].a - p.th)); }
+    else gl.uniform4f(SU.uLegA, 0, 0, 0, 0);
     gl.uniform1f(SU.uPhase, sh.phase); gl.uniform1f(SU.uWalk, sh.walk); gl.uniform1f(SU.uHead, Math.max(0, Math.min(1, sh.head)));
-    gl.uniform1f(SU.uNib, sh.nib); gl.uniform1f(SU.uPx, 1 / (p.L * s * Math.max(0.3, Math.abs(f)))); gl.uniform1f(SU.uSeed, sh.seed);
+    gl.uniform1f(SU.uNib, sh.nib); gl.uniform1f(SU.uPx, 1 / (ps.L * ps.sq[1] * s * Math.max(0.3, Math.abs(ps.f)))); gl.uniform1f(SU.uSeed, sh.seed);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   });
   gl.disable(gl.BLEND);
@@ -932,7 +1143,7 @@ function frame(now){
   raf = requestAnimationFrame(frame);
   if (!last) last = now;
   var el = now - last;
-  if (el < 1000 / FPS - 3) return;
+  if (el < 1000 / (busy() ? 60 : FPS) - 3) return;                       // full frame rate while you play with a sheep
   last = now;
   var dt = Math.min(0.1, el / 1000);
   t += dt; stepFlock(dt);
@@ -946,7 +1157,7 @@ function frame(now){
 /* ---------------- lifecycle: only while the daytime photo is on screen ---------------- */
 var want = false, booting = null, failed = false, shown = false;
 function run(){ if (!raf && ready && want && !document.hidden) { last = 0; raf = requestAnimationFrame(frame); } }
-function halt(){ if (raf) { cancelAnimationFrame(raf); raf = 0; } }
+function halt(){ if (drag) letGo(null); if (raf) { cancelAnimationFrame(raf); raf = 0; } }
 function boot(){
   if (booting) return booting;
   var optional = {'depth.png': 1, 'flock-clean.png': 1, 'occ.png': 1};      // a 1-pixel stand-in when a photo doesn't need one
@@ -968,7 +1179,79 @@ function scene(name, set){
 document.addEventListener('visibilitychange', function(){ if (document.hidden) halt(); else run(); });
 var rT = 0; addEventListener('resize', function(){ clearTimeout(rT); rT = setTimeout(function(){ if (ready) { layout(); if (want) draw(); } }, 160); });
 addEventListener('pointermove', function(e){ if (e.pointerType !== 'mouse') return; ptr.x = (e.clientX / innerWidth - 0.5) * 2; ptr.y = (e.clientY / innerHeight - 0.5) * 2; }, {passive: true});
+
+/* ---------------- picking sheep up: pointer handling ---------------- */
+var UI = 'a,button,input,textarea,select,label,[role=button],[role=tab],[role=dialog],.card,.tabbar,.sheet-wrap,.hero-h';
+function imgPt(cx, cy){ var r = canvas.getBoundingClientRect(), k = view.cw / (r.width || 1); return {x: ((cx - r.left) * k - view.ox) / view.s, y: ((cy - r.top) * k - view.oy) / view.s, k: k}; }
+function canPlay(e){
+  if (!ready || !raf || !sheepOn || holding || !view) return false;
+  if (e.pointerType !== 'mouse' && !document.body.classList.contains('viewing')) return false;   // phones: in the view only, so scrolling stays scrolling
+  return !(e.target && e.target.closest && e.target.closest(UI));
+}
+function sheepAt(pt, touch){                               // the sheep under your finger, with a generous target for fingers
+  var best = null, bd = 1, r0 = (touch ? 24 : 6) * pt.k / view.s;
+  flock.forEach(function(sh){
+    var ps = pose(sh), c = at(ps, PC[0], PC[1]), L = ps.L * ps.sq[1];
+    var dx = (pt.x - c.x) / Math.max(0.55 * L, r0), dy = (pt.y - c.y) / Math.max(0.4 * L, r0), d = dx * dx + dy * dy;
+    if (d < bd) { best = sh; bd = d; }
+  });
+  return best;
+}
+// how fast your finger was moving as you let go: a least-squares line through the last 100 ms of samples
+// (as Android's VelocityTracker and eSheep do); if it had stopped for 45 ms, the sheep just drops
+function flick(s, tUp){
+  var n = s.length; if (n < 2 || tUp - s[n - 1].t > 45) return {x: 0, y: 0};
+  var tEnd = s[n - 1].t, w = s.filter(function(q){ return tEnd - q.t <= 100; }); if (w.length < 2) w = s.slice(-2);
+  var mt = 0, mx = 0, my = 0; w.forEach(function(q){ mt += q.t; mx += q.x; my += q.y; }); mt /= w.length; mx /= w.length; my /= w.length;
+  var tt = 0, tx = 0, ty = 0; w.forEach(function(q){ var d = q.t - mt; tt += d * d; tx += d * (q.x - mx); ty += d * (q.y - my); });
+  return tt > 1e-3 ? {x: tx / tt * 1000, y: ty / tt * 1000} : {x: 0, y: 0};
+}
+document.addEventListener('pointerdown', function(e){
+  if (drag || !e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0) || !canPlay(e)) return;
+  var touch = e.pointerType !== 'mouse', pt = imgPt(e.clientX, e.clientY), sh = sheepAt(pt, touch);
+  if (!sh) return;
+  e.preventDefault(); e.stopPropagation();
+  grab(sh, pt, touch, e);
+  try { e.target.setPointerCapture(e.pointerId); } catch (err) {}
+  document.documentElement.classList.add('sheep-grab'); document.documentElement.classList.remove('sheep-hover');
+  if (navigator.vibrate) try { navigator.vibrate(8); } catch (err) {}
+}, true);
+addEventListener('pointermove', function(e){
+  if (drag && e.pointerId === drag.id) {
+    var evs = e.getCoalescedEvents ? e.getCoalescedEvents() : null; if (!evs || !evs.length) evs = [e];
+    for (var i = 0; i < evs.length; i++) { var q = imgPt(evs[i].clientX, evs[i].clientY); drag.samples.push({t: evs[i].timeStamp, x: q.x, y: q.y}); }
+    var last = drag.samples[drag.samples.length - 1]; drag.x = last.x; drag.y = last.y;
+    while (drag.samples.length > 3 && last.t - drag.samples[0].t > 160) drag.samples.shift();
+    return;
+  }
+  if (e.pointerType !== 'mouse' || drag) return;
+  var now = performance.now(); if (now - (hoverT || 0) < 60) return; hoverT = now;        // a grab cursor over a sheep
+  document.documentElement.classList.toggle('sheep-hover', canPlay(e) && !!sheepAt(imgPt(e.clientX, e.clientY), false));
+}, {passive: true});
+var hoverT = 0;
+function drop(e){
+  if (!drag || e.pointerId !== drag.id) return;
+  letGo(e.type === 'pointerup' ? flick(drag.samples, e.timeStamp) : null);   // a cancelled touch just lets it fall
+  document.documentElement.classList.remove('sheep-grab');
+}
+addEventListener('pointerup', drop, true); addEventListener('pointercancel', drop, true);
+addEventListener('click', function(e){ if (performance.now() - lastDrop < 350) { e.stopPropagation(); e.preventDefault(); } }, true);   // a drop is not a click
+// A touch on a sheep is a grab, not a scroll, a zoom or a long-press magnifier. That has to be decided in touchstart
+// (pointer events can't stop panning), and only for touches that land on a sheep.
+document.addEventListener('touchstart', function(e){
+  if (!e.cancelable) return;
+  if (drag && drag.touch) { e.preventDefault(); return; }
+  if (e.touches.length !== 1 || !ready || !raf || !view || !document.body.classList.contains('viewing')) return;
+  var t = e.touches[0];
+  if (e.target && e.target.closest && e.target.closest(UI)) return;
+  if (sheepAt(imgPt(t.clientX, t.clientY), true)) e.preventDefault();
+}, {passive: false});
+document.addEventListener('touchmove', function(e){ if (drag && drag.touch && e.cancelable) e.preventDefault(); }, {passive: false});
 window.LIVING = {scene: scene, get fps(){ return fps; }, get running(){ return !!raf; }, get ready(){ return ready; }, flock: flock,
+  get held(){ return drag ? flock.indexOf(drag.sh) : -1; },
+  spot: function(i){                                       // where sheep i's middle is on screen, in CSS px (for tests and films)
+    if (!view) return null; var ps = pose(flock[i]), c = at(ps, PC[0], PC[1]), r = canvas.getBoundingClientRect(), k = view.cw / (r.width || 1);
+    return {x: (c.x * view.s + view.ox) / k + r.left, y: (c.y * view.s + view.oy) / k + r.top, L: ps.L * view.s / k, mode: flock[i].p ? flock[i].p.mode : flock[i].state}; },
   renderAt: function(sec, steps){ halt(); want = false; var n = steps || 0, dt = n ? (sec - t) / n : 0; for (var i = 0; i < n; i++) { t += dt; stepFlock(dt); } t = sec; amp.clouds = on.clouds ? 1 : 0; amp.water = on.water ? 1 : 0; amp.grass = on.grass ? 1 : 0; draw(); canvas.classList.add('on'); }};
 })();
 </script>
@@ -1045,13 +1328,16 @@ function applyScene(s){
 }
 applyScene(root.getAttribute('data-scene')||'dawn');
 
-const state={gmail:null,outlook:null,calendar:null,loaded:{gmail:false,outlook:false,calendar:false},error:null,timedOut:false,view:'overview'};
+const state={gmail:null,outlook:null,calendar:null,done:null,loaded:{gmail:false,outlook:false,calendar:false,done:false},error:null,timedOut:false,view:'overview'};
 let viewing=false;
 let sheetOpen=false,sheetFrom=null;
 const collapsed=(()=>{try{return JSON.parse(localStorage.getItem('brief-collapsed')||'{}')||{}}catch(e){return {}}})();
 const arr=a=>Array.isArray(a)?a:[];
 try{const v=localStorage.getItem('brief-view');if(['overview','calls','inbox','data'].includes(v))state.view=v}catch(e){}
-let ready=false,animateNext=false,lastHTML='',LD={gmail:false,outlook:false,calendar:false};
+let ready=false,animateNext=false,heroIn=true,lastHTML='',LD={gmail:false,outlook:false,calendar:false,done:false};
+let holds=0,held=false,freshKey=null;          // renders wait while a row folds away or a tab fades out
+const hold=()=>{holds++};
+const release=()=>{if(holds>0)holds--;if(!holds){held=false;render()}};
 
 const main=document.getElementById('main');
 const tabbar=document.querySelector('.tabbar');
@@ -1082,8 +1368,9 @@ function hero(g,c,today,nowMin,now,nowHM){
   const greet=h>=5&&h<12?'Good morning':h>=12&&h<18?'Good afternoon':'Good evening';
   const parts=[];
   if(LD.calendar&&c){const n=todayEvents(c,today).filter(e=>isLeft(e,nowMin)).length;parts.push({t:n?`${n} ${plural(n,'call','calls')} left today`:'no calls left today'})}
-  const inboxes=[IB.work&&LD.outlook&&state.outlook,IB.personal&&LD.gmail&&g].filter(Boolean);
-  if(inboxes.length){const k=inboxes.reduce((a,d)=>a+arr(d.needYou).length,0);parts.push(k?{t:`${k} ${plural(k,'thing needs','things need')} you`,open:true}:{t:'nothing needs you'})}
+  const inb=[IB.work&&[LD.outlook&&state.outlook,'outlook'],IB.personal&&[LD.gmail&&g,'gmail']].filter(x=>x&&x[0]);
+  if(inb.length){const k=inb.reduce((a,[d,s])=>a+openNeed(d,s),0),dn=inb.reduce((a,[d,s])=>a+doneNeed(d,s),0);
+    parts.push(k?{t:`${k} ${plural(k,'thing needs','things need')} you`,open:true}:dn?{t:'all signed off',open:true}:{t:'nothing needs you'})}
   if(parts.length)parts[0].t=parts[0].t.charAt(0).toUpperCase()+parts[0].t.slice(1);
   const s=parts.length?parts.map(p=>p.open?`<button class="sum-link" data-open="needs">${esc(p.t)}</button>`:esc(p.t)).join(' · ')
     :esc(ready?'Your brief fills in after the morning refresh':'Loading your day…');
@@ -1134,7 +1421,7 @@ function stats(g,c,today,nowMin){
     return loaded&&act?`<button class="card stat" ${act}><span class="go" aria-hidden="true">${svg('right')}</span>${inner}</button>`:`<div class="card stat">${inner}</div>`;
   };
   const o=state.outlook;
-  const need=(g||o)?arr(g&&g.needYou).length+arr(o&&o.needYou).length:'–';
+  const need=(g||o)?openNeed(g,'gmail')+openNeed(o,'outlook'):'–';
   const left=c?todayEvents(c,today).filter(e=>isLeft(e,nowMin)).length:'–';
   const week=c?(c.days||[]).filter(d=>d.date>=today).reduce((n,d)=>n+((d.events||[]).length),0):'–';
   return tile('alertc',need,'Need you',LD.gmail&&LD.outlook,`data-open="needs" aria-label="${esc(need)} need you: show them"`)
@@ -1176,22 +1463,46 @@ function weekSection(c,today){
   return sec('Later this week','',body);
 }
 
-function mailRow(x,icon,strong,account){
+/* Sign-offs: ticked emails are kept in brief/done (your page's own database), so they stay done on every device.
+   The morning task reads it and leaves them out, unless something new arrives in that thread. */
+const done={};
+try{const v=JSON.parse(localStorage.getItem('brief-done')||'{}');if(v&&typeof v==='object')Object.assign(done,v)}catch(e){}
+const hashKey=s=>{let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,0x01000193)}return (h>>>0).toString(36)};
+// an email's key is its link; where a brief repeats a link (example data, or a link that isn't the email's own), title and sender join in
+const dupUrls=new WeakMap();
+function dupsOf(doc){if(!doc)return null;let d=dupUrls.get(doc);if(!d){const seen={};d=new Set();items(doc).forEach(x=>{const u=String(x.url||'');if(u){if(seen[u])d.add(u);seen[u]=1}});dupUrls.set(doc,d)}return d}
+const itemKey=(src,x,doc)=>{const u=String(x.url||''),d=dupsOf(doc);return src[0]+hashKey(u&&!(d&&d.has(u))?u:`${u}|${x.title||''}|${x.sender||x.source||''}`)};
+// done: you ticked it off after its newest message arrived (a newer message in the thread brings it back).
+// Older briefs carry no receivedAt; for those, a tick counts when it came after the brief was written.
+function isDone(k,doc,x){const d=done[k];if(!d)return false;const a=Date.parse(d.at),r=x&&Date.parse(x.receivedAt);
+  if(r)return a>=r;const g=Date.parse(doc&&doc.generatedAt);return !(g&&a&&a<g)}
+const items=doc=>doc?[...arr(doc.needYou),...arr(doc.worthLook),...arr(doc.worthReading)]:[];
+const openNeed=(doc,src)=>arr(doc&&doc.needYou).filter(x=>!isDone(itemKey(src,x,doc),doc,x)).length;
+const doneNeed=(doc,src)=>arr(doc&&doc.needYou).filter(x=>isDone(itemKey(src,x,doc),doc,x)).length;
+
+function mailRow(x,kind,account,src,doc){
+  const k=itemKey(src,x,doc),d=isDone(k,doc,x),t=esc(x.title||'');
   const meta=[x.sender,x.time].filter(Boolean).map(esc).join(' · ');
   const u=safeUrl(x.url);const sub=x.action||x.why;
-  return `<div class="row"><span class="tile${strong?' strong':''}">${svg(icon)}</span><div>
-    <div class="r-title">${esc(x.title||'')}</div>${sub?`<div class="r-sub">${esc(sub)}</div>`:''}
+  const tick=`<button class="tick${kind==='need'?' need':''}" data-k="${k}" data-s="${src}" aria-pressed="${d}" aria-label="${d?'Mark as not done':'Mark as done'}: ${t}">${svg('check')}</button>`;
+  const open=u?`<a class="btn" href="${esc(u)}" target="_blank" rel="noopener noreferrer" aria-label="Open in ${esc(account||'mail')}: ${t}">Open${svg('arrow')}</a>`:'<span></span>';
+  if(d)return `<div class="row done" data-row="${k}">${tick}<div><div class="r-title">${t}</div>${(meta||x.source)?`<div class="r-meta">${x.source?`<span>${esc(x.source)}</span>`:''}${meta?`<span>${meta}</span>`:''}</div>`:''}</div>${open}</div>`;
+  return `<div class="row" data-row="${k}">${tick}<div>
+    <div class="r-title">${t}</div>${sub?`<div class="r-sub">${esc(sub)}</div>`:''}
     ${x.deadline?`<div class="deadline">${svg('clock')}<span>${esc(x.deadline)}</span></div>`:''}
     ${(meta||x.source)?`<div class="r-meta">${x.source?`<span class="badge">${esc(x.source)}</span>`:''}${meta?`<span>${meta}</span>`:''}</div>`:''}</div>
-    ${u?`<a class="btn" href="${esc(u)}" target="_blank" rel="noopener noreferrer" aria-label="Open in ${esc(account||'mail')}: ${esc(x.title||'')}">Open${svg('arrow')}</a>`:'<span></span>'}</div>`;
+    ${open}</div>`;
 }
 /* One block per inbox: Work (Outlook) and Personal (Gmail) */
-function inboxBlock(doc,loaded,title,account,emptyMsg,key){
+function inboxBlock(doc,loaded,title,account,emptyMsg,key,src){
   const closed=!!collapsed[key];
+  const split=list=>{const o=[],d=[];arr(list).forEach(x=>(isDone(itemKey(src,x,doc),doc,x)?d:o).push(x));return [o,d]};
+  const [n,nd]=split(doc&&doc.needYou),[w,wd]=split(doc&&doc.worthLook),[r,rd]=split(doc&&doc.worthReading);
+  const nDone=nd.length+wd.length+rd.length;
   const counts=()=>{
     if(!loaded)return '';if(!doc)return 'nothing yet';
-    const n=arr(doc.needYou).length,w=arr(doc.worthLook).length,r=arr(doc.worthReading).length;
-    const bits=[n?`<b>${n} need${n===1?'s':''} you</b>`:'nothing needs you'];if(w)bits.push(`${w} to look at`);if(r)bits.push(`${r} to read`);
+    const bits=[n.length?`<b>${n.length} need${n.length===1?'s':''} you</b>`:'nothing needs you'];
+    if(w.length)bits.push(`${w.length} to look at`);if(r.length)bits.push(`${r.length} to read`);if(nDone)bits.push(`${nDone} done`);
     return bits.join(' · ');
   };
   const block=(right,body)=>`<section class="sec ib${closed?' closed':''}" data-ib="${key}"><div class="sec-h">
@@ -1199,27 +1510,30 @@ function inboxBlock(doc,loaded,title,account,emptyMsg,key){
     <div class="ib-body" id="ib-${key}"><div class="ib-in">${body}</div></div></section>`;
   if(!loaded)return block('',skelRows(2));
   if(!doc)return block('',empty(emptyMsg));
-  const n=arr(doc.needYou),w=arr(doc.worthLook),r=arr(doc.worthReading),s=arr(doc.skipped);
+  const s=arr(doc.skipped);
   const grp=t=>`<div class="grp">${esc(t)}</div>`;
-  let h=n.length?grp('Needs you')+n.map(x=>mailRow(x,'exclaim',true,account)).join('')
-    :`<div class="row calm"><span class="tile">${svg('check')}</span><div class="r-title">Nothing needs you</div><span></span></div>`;
-  if(w.length)h+=grp('Worth a look')+w.map(x=>mailRow(x,'eye',false,account)).join('');
-  if(r.length)h+=grp('Worth reading')+r.map(x=>mailRow(x,'book',false,account)).join('');
+  const rows=(list,kind)=>list.map(x=>mailRow(x,kind,account,src,doc)).join('');
+  let h=n.length?grp('Needs you')+rows(n,'need')
+    :`<div class="row calm"><span class="tile">${svg('check')}</span><div class="r-title">${nd.length?'All signed off':'Nothing needs you'}</div><span></span></div>`;
+  if(w.length)h+=grp('Worth a look')+rows(w,'look');
+  if(r.length)h+=grp('Worth reading')+rows(r,'read');
+  if(nDone)h+=grp(`Done · ${nDone}`)+rows(nd,'need')+rows(wd,'look')+rows(rd,'read');
   if(s.length){const total=s.reduce((a,x)=>a+(+x.count||0),0);
     h+=grp(`Skipped · ${total}`)+`<div class="chips">${s.map(x=>`<span class="chip"><b>${esc(x.count)}</b>${esc(x.label)}</span>`).join('')}</div>`}
   return block(stamp(doc,'Updated'),`<div class="card">${h}</div>`);
 }
 
 function render(){
+  if(holds){held=true;return}
   const now=new Date(),today=ymd(now),nowHM=hm(now),nowMin=toMin(nowHM);
   const sc=B.sceneAt(now);if(sc!==root.getAttribute('data-scene'))applyScene(sc);
   const g=state.gmail,c=state.calendar;
-  LD={gmail:ready&&state.loaded.gmail,outlook:ready&&state.loaded.outlook,calendar:ready&&state.loaded.calendar};
+  LD={gmail:ready&&state.loaded.gmail,outlook:ready&&state.loaded.outlook,calendar:ready&&state.loaded.calendar,done:ready&&state.loaded.done};
   const S={
     today:()=>todaySection(c,today,nowMin,nowHM),
     week:()=>weekSection(c,today),
-    work:()=>inboxBlock(state.outlook,LD.outlook,IB.work.label,IB.work.account,`Your ${IB.work.account} inbox appears here after the morning refresh.`,'work'),
-    personal:()=>inboxBlock(g,LD.gmail,IB.personal.label,IB.personal.account,`Your ${IB.personal.account} digest appears here after the morning refresh.`,'personal')
+    work:()=>inboxBlock(state.outlook,LD.outlook,IB.work.label,IB.work.account,`Your ${IB.work.account} inbox appears here after the morning refresh.`,'work','outlook'),
+    personal:()=>inboxBlock(g,LD.gmail,IB.personal.label,IB.personal.account,`Your ${IB.personal.account} digest appears here after the morning refresh.`,'personal','gmail')
   };
   const wide=mqWide.matches;
   const layouts={
@@ -1235,17 +1549,18 @@ function render(){
     const cols=L.map(col=>col.map(k=>S[k]()).join(''));
     html+=L.length>1?`<div class="cols">${cols.map(x=>`<div>${x}</div>`).join('')}</div>`:cols[0];
   }
-  html+=`<p class="foot">${state.demo?'Example data. Set it up in Claude to see your own.':'Refreshes automatically every morning'}</p>`;
+  html+=`<p class="foot">${state.demo?'Example data. Set it up in Claude to see your own.':'Refreshes automatically'}</p>`;
   if(html!==lastHTML){
-    main.classList.toggle('anim',animateNext);
+    main.classList.toggle('anim',animateNext);main.classList.toggle('hero-in',animateNext&&heroIn);
     main.innerHTML=html;lastHTML=html;
-    if(animateNext){let i=0;main.querySelectorAll('.hero-h,.card,.sec-h,.day-h').forEach(el=>{el.style.animationDelay=Math.min(i++,14)*28+'ms'})}
-    animateNext=false;
+    if(animateNext){let i=0;main.querySelectorAll((heroIn?'.hero-h,':'')+'.card,.sec-h,.day-h,.foot').forEach(el=>{el.style.animationDelay=Math.min(i++,10)*36+'ms'})}
+    animateNext=false;heroIn=true;
     main.querySelectorAll('[data-pct]').forEach(el=>{el.style.width=el.dataset.pct+'%'});
   }
   const sum=main.querySelector('.summary');
   document.getElementById('sr').textContent='Daily brief. '+(sum?sum.textContent:'');
   if(sheetOpen)fillSheet();
+  if(freshKey){document.querySelectorAll(`[data-row="${freshKey}"]`).forEach(r=>r.classList.add('fresh'));freshKey=null}
 }
 
 /* Data view: the three raw entries in the page's database, as the morning task wrote them */
@@ -1255,28 +1570,31 @@ function hlJSON(json){
 }
 function dataView(){
   const shortUrl=(k,v)=>typeof v==='string'&&/^https?:/.test(v)&&v.length>64?v.slice(0,60)+'…':v;
-  const cards=['outlook','gmail','calendar'].map(k=>{
+  const cards=['outlook','gmail','calendar','done'].map(k=>{
     const d=state[k];const loaded=LD[k];
-    const head=`<div class="dv-h"><code>brief/${k}</code>${d?stamp(d,'Written'):''}${d?`<button class="btn dv-copy" data-k="${k}">Copy</button>`:''}</div>`;
+    const written=d&&k==='done'&&d.updatedAt?stamp({generatedAt:d.updatedAt},'Written'):d?stamp(d,'Written'):'';
+    const head=`<div class="dv-h"><code>brief/${k}</code>${written}${d?`<button class="btn dv-copy" data-k="${k}">Copy</button>`:''}</div>`;
     const body=!loaded?'<div class="dv-empty"><span class="skel w80"></span><span class="skel w60"></span></div>'
-      :d?`<pre class="dv-json">${hlJSON(JSON.stringify(d,shortUrl,2))}</pre>`:'<div class="dv-empty">Empty until the next morning refresh writes it.</div>';
+      :d?`<pre class="dv-json">${hlJSON(JSON.stringify(d,shortUrl,2))}</pre>`
+      :`<div class="dv-empty">${k==='done'?'Empty until you tick something off.':'Empty until the next morning refresh writes it.'}</div>`;
     return `<div class="card">${head}${body}</div>`;
   }).join('');
-  return sec('Database',`<span class="stamp">collection brief · 3 entries</span>`,`<div class="dv">${cards}</div>`);
+  return sec('Database',`<span class="stamp">collection brief · 4 entries</span>`,`<div class="dv">${cards}</div>`);
 }
 /* Needs-you sheet: everything waiting on you, from both inboxes, with a way into each email */
 const sheet=document.getElementById('sheet'),sheetB=document.getElementById('sheet-b'),sheetT=document.getElementById('sheet-t');
 function fillSheet(){
-  const src=[IB.work&&[IB.work.label,IB.work.account,state.outlook,LD.outlook],IB.personal&&[IB.personal.label,IB.personal.account,state.gmail,LD.gmail]].filter(Boolean);
-  const total=src.reduce((a,x)=>a+(x[2]?arr(x[2].needYou).length:0),0);
+  const src=[IB.work&&[IB.work.label,IB.work.account,state.outlook,LD.outlook,'outlook'],IB.personal&&[IB.personal.label,IB.personal.account,state.gmail,LD.gmail,'gmail']].filter(Boolean);
+  const total=src.reduce((a,x)=>a+openNeed(x[2],x[4]),0);
   sheetT.innerHTML=`Needs you<small>${total}</small>`;
   let h='';
-  src.forEach(([label,acct,doc,loaded])=>{
-    const n=doc?arr(doc.needYou):[];
+  src.forEach(([label,acct,doc,loaded,s])=>{
+    const all=doc?arr(doc.needYou):[],n=all.filter(x=>!isDone(itemKey(s,x,doc),doc,x)),d=all.filter(x=>isDone(itemKey(s,x,doc),doc,x));
     h+=`<div class="grp">${esc(label)}<span class="acct">${esc(acct)}</span></div>`;
     h+=!loaded?'<div class="row"><span class="tile ph"></span><div><span class="skel w80"></span><span class="skel w40"></span></div><span></span></div>'
-      :n.length?n.map(x=>mailRow(x,'exclaim',true,acct)).join('')
-      :`<div class="row calm"><span class="tile">${svg('check')}</span><div class="r-sub">Nothing here needs you</div><span></span></div>`;
+      :(n.length?n.map(x=>mailRow(x,'need',acct,s,doc)).join('')
+        :`<div class="row calm"><span class="tile">${svg('check')}</span><div class="r-sub">${d.length?'All signed off':'Nothing here needs you'}</div><span></span></div>`)
+       +d.map(x=>mailRow(x,'need',acct,s,doc)).join('');
   });
   h+=`<div class="sheet-f"><button class="btn" data-go="inbox">See the full inboxes${svg('right')}</button></div>`;
   sheetB.innerHTML=h;
@@ -1296,7 +1614,42 @@ function closeSheet(){
   if(reduced)done();else setTimeout(done,420);
   if(sheetFrom&&document.contains(sheetFrom))sheetFrom.focus({preventScroll:true});
 }
+/* Tick an email off: the circle fills, the row folds away and lands under Done. Tick it again to bring it back. */
+let doneRef=null,saving=false,saveAgain=false;
+const pend={};
+async function saveDone(){
+  const cut=Date.now()-21*864e5;                               // sign-offs are kept three weeks
+  for(const k of Object.keys(done))if(!(Date.parse(done[k]&&done[k].at)>cut))delete done[k];
+  try{localStorage.setItem('brief-done',JSON.stringify(done))}catch(e){}
+  if(!doneRef)return;
+  if(saving){saveAgain=true;return}                            // one write at a time; the last state wins
+  saving=true;
+  try{do{saveAgain=false;await doneRef.set({updatedAt:new Date().toISOString(),items:JSON.parse(JSON.stringify(done))})}while(saveAgain)}
+  catch(e){try{console.warn('Sign-off not saved:',e&&e.code)}catch(_){}}
+  finally{saving=false}
+}
+function fold(row){
+  if(!row||!row.isConnected||!row.animate||matchMedia('(prefers-reduced-motion: reduce)').matches)return Promise.resolve();
+  const h=row.getBoundingClientRect().height;row.style.overflow='hidden';
+  return row.animate([{height:h+'px',opacity:1},{height:'0px',opacity:0,paddingTop:'0px',paddingBottom:'0px'}],
+    {duration:300,easing:'cubic-bezier(.4,0,.2,1)',fill:'forwards'}).finished.then(()=>{},()=>{});
+}
+function toggleDone(b){
+  const k=b.dataset.k,src=b.dataset.s,doc=state[src];
+  const x=items(doc).find(i=>itemKey(src,i,doc)===k);if(!x)return;
+  const on=!isDone(k,doc,x);
+  if(on){const u=safeUrl(x.url);done[k]=Object.assign({at:new Date().toISOString(),title:String(x.title||'').slice(0,140)},u?{url:u}:{})}
+  else delete done[k];
+  saveDone();
+  b.setAttribute('aria-pressed',String(on));b.setAttribute('aria-label',(on?'Mark as not done':'Mark as done')+': '+(x.title||''));
+  const row=b.closest('.row');if(row)row.classList.toggle('done',on);
+  if(on&&navigator.vibrate)try{navigator.vibrate(10)}catch(e){}
+  if(pend[k]){clearTimeout(pend[k]);delete pend[k];release();return}   // changed your mind: it stays where it was
+  hold();
+  pend[k]=setTimeout(()=>{delete pend[k];fold(row).then(()=>{freshKey=k;release()})},on?650:200);
+}
 sheet.addEventListener('click',e=>{
+  const tk=e.target.closest('.tick');if(tk){toggleDone(tk);return}
   if(e.target.closest('[data-close]'))closeSheet();
   const go=e.target.closest('[data-go]');if(go){closeSheet();setView(go.dataset.go)}
 });
@@ -1331,6 +1684,7 @@ sheet.addEventListener('keydown',e=>{
   panel.addEventListener('touchend',end);panel.addEventListener('touchcancel',end);
 })();
 main.addEventListener('click',e=>{
+  const tk=e.target.closest('.tick');if(tk){toggleDone(tk);return}
   const o=e.target.closest('[data-open="needs"]');if(o){openSheet(o);return}
   const g=e.target.closest('[data-go]');if(g){setView(g.dataset.go);return}
   const t=e.target.closest('.ib-toggle');
@@ -1358,11 +1712,17 @@ function placeLens(move){
   lens.style.transform=`translateX(${b.offsetLeft}px)`;
   if(move){lens.classList.add('moving');clearTimeout(placeLens.t);placeLens.t=setTimeout(()=>lens.classList.remove('moving'),220)}
 }
+let swapT=0,swapFar=false;
 function setView(v,focus){
   state.view=v;try{localStorage.setItem('brief-view',v)}catch(e){}
   tabs.forEach(t=>{const on=t.dataset.v===v;t.setAttribute('aria-selected',String(on));t.tabIndex=on?0:-1;if(on&&focus)t.focus()});
   main.setAttribute('aria-labelledby','tab-'+v);
-  placeLens(true);animateNext=ready;render();window.scrollTo(0,0);
+  placeLens(true);
+  if(!ready||matchMedia('(prefers-reduced-motion: reduce)').matches){animateNext=ready;render();window.scrollTo(0,0);return}
+  // the old view fades up and out first; the swap and the jump to the top happen while nothing shows
+  if(swapT)clearTimeout(swapT);
+  else{swapFar=window.scrollY>40;hold();main.querySelectorAll((swapFar?'.hero-h,':'')+'.card,.sec-h,.day-h,.foot').forEach(el=>el.classList.add('leaving'))}
+  swapT=setTimeout(()=>{swapT=0;animateNext=true;heroIn=swapFar;window.scrollTo(0,0);release()},200);
 }
 tabs.forEach((t,i)=>{
   t.addEventListener('click',()=>{if(state.view===t.dataset.v){window.scrollTo({top:0,behavior:'smooth'});return}setView(t.dataset.v)});
@@ -1399,7 +1759,7 @@ function maybeReady(){
       for(const k of ['gmail','outlook','calendar']){const d=JSON.parse(JSON.stringify(demo['brief/'+k]));d.date=today;d.generatedAt=stamp;
         if(d.days)d.days.forEach((x,i)=>{x.date=shift(x.date);const L=fLong.format(new Date(x.date+'T12:00:00Z'));x.label=i===0?'Today · '+L:L});
         state[k]=d;state.loaded[k]=true}
-      state.demo=true;maybeReady();render();return;
+      state.loaded.done=true;state.demo=true;maybeReady();render();return;   // sign-offs stay in this browser
     }catch(e){}
     state.error='Sign in to claude.ai to see your brief.';maybeReady();render();return
   }
@@ -1411,6 +1771,17 @@ function maybeReady(){
     maybeReady();render();
   },()=>{state.loaded[k]=true;state.error='Your brief couldn’t be loaded on this visit.';clearTimeout(timer);maybeReady();render()});
   sub('gmail');sub('outlook');sub('calendar');
+  // your sign-offs, live across your devices (the page's rules keep them readable by you alone)
+  doneRef=db.doc('brief/done');
+  doneRef.onSnapshot(s=>{
+    if(!saving){
+      const d=s.exists?s.data():null,it=d&&d.items&&typeof d.items==='object'?d.items:{};
+      for(const k of Object.keys(done))delete done[k];
+      for(const [k,v] of Object.entries(it))if(v&&typeof v.at==='string')done[k]=Object.assign({at:v.at,title:String(v.title||'')},typeof v.url==='string'?{url:v.url}:{});
+      state.done=d;try{localStorage.setItem('brief-done',JSON.stringify(done))}catch(e){}
+    }
+    state.loaded.done=true;render();
+  },()=>{state.loaded.done=true;render()});
 })();
 </script>
 </body>

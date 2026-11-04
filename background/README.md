@@ -11,6 +11,8 @@ All of it is in [`page/index.html`](../page/index.html): plain JavaScript and We
 - **Their behaviour.** Each sheep is a small state machine in JavaScript: graze, look up, walk, each on a random timer. A walk picks a random free spot inside the fenced field, turns and heads there.
 - **Perspective.** Positions live on a flat ground in metres and are projected into the photo with a pinhole camera fitted to it, so a sheep further away is smaller and higher in the frame.
 
+- **Picking them up.** Held, a sheep hangs from its scruff: its body swings as a pendulum driven by your finger's acceleration, and each leg dangles as its own small pendulum with joint limits and the odd kick. Let go and it flies under (doubled) gravity, rights itself in the air, lands with a squash and a crouch, and goes back to grazing. It all runs on the same ground plane, so a sheep you carry to the back of the field gets smaller.
+
 Because the sheep are simulated, it never repeats.
 
 ## The files it reads
