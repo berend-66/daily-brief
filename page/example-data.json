@@ -5,13 +5,13 @@
     "days": [
       {
         "date": "2026-11-04",
-        "label": "Today · Wednesday 4 November",
+        "label": "Today \u00b7 Wednesday 4 November",
         "events": [
           {
             "start": "09:30",
             "end": "10:00",
             "title": "Portfolio check-in",
-            "who": "Sophie, Mark, Lena · Video call",
+            "who": "Sophie, Mark, Lena \u00b7 Video call",
             "tentative": false
           },
           {
@@ -25,7 +25,7 @@
             "start": "15:00",
             "end": "15:45",
             "title": "Founder intro: Kestrel Labs",
-            "who": "Noor Bakker · Video call",
+            "who": "Noor Bakker \u00b7 Video call",
             "tentative": false
           }
         ]
@@ -38,7 +38,7 @@
             "start": "10:00",
             "end": "10:30",
             "title": "Weekly team sync",
-            "who": "Team · Video call",
+            "who": "Team \u00b7 Video call",
             "tentative": false
           },
           {
@@ -81,7 +81,7 @@
         "action": "Review the NDA and sign it before the founder call.",
         "sender": "Noor Bakker",
         "time": "08:12",
-        "url": "https://mail.example.com/work/1"
+        "url": "https://outlook.office.com/mail/inbox"
       }
     ],
     "worthLook": [
@@ -90,21 +90,21 @@
         "action": "Add your two discussion points by Thursday.",
         "sender": "Mark Peters",
         "time": "Tue 17:20",
-        "url": "https://mail.example.com/work/2"
+        "url": "https://outlook.office.com/mail/inbox"
       },
       {
         "title": "Intro request: a climate-tech founder",
         "action": "Reply if you want the intro.",
         "sender": "Lena Novak",
         "time": "07:55",
-        "url": "https://mail.example.com/work/3"
+        "url": "https://outlook.office.com/mail/inbox"
       },
       {
         "title": "October data export is ready",
         "action": "Check the export before the review.",
         "sender": "Data team",
         "time": "Tue 18:02",
-        "url": "https://mail.example.com/work/4"
+        "url": "https://outlook.office.com/mail/inbox"
       }
     ],
     "worthReading": [
@@ -112,13 +112,13 @@
         "title": "What AI agents change in due diligence",
         "why": "A short essay on agents in investment work.",
         "source": "Weekly AI letter",
-        "url": "https://mail.example.com/work/5"
+        "url": "https://outlook.office.com/mail/inbox"
       },
       {
         "title": "European growth rounds in Q3",
         "why": "Round sizes and valuations by sector.",
         "source": "Market notes",
-        "url": "https://mail.example.com/work/6"
+        "url": "https://outlook.office.com/mail/inbox"
       }
     ],
     "skipped": [
@@ -150,7 +150,7 @@
         "deadline": "Confirm before today 18:00",
         "sender": "City Dental",
         "time": "Tue 19:10",
-        "url": "https://mail.example.com/home/1"
+        "url": "https://mail.google.com/mail/u/0/#inbox"
       }
     ],
     "worthLook": [
@@ -159,7 +159,7 @@
         "action": "Download the tickets before Friday.",
         "sender": "Rail tickets",
         "time": "07:40",
-        "url": "https://mail.example.com/home/2"
+        "url": "https://mail.google.com/mail/u/0/#inbox"
       }
     ],
     "worthReading": [
@@ -167,7 +167,7 @@
         "title": "Running club: the November routes",
         "why": "New Sunday route and start times.",
         "source": "Running club",
-        "url": "https://mail.example.com/home/3"
+        "url": "https://mail.google.com/mail/u/0/#inbox"
       }
     ],
     "skipped": [

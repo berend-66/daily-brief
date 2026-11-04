@@ -19,13 +19,15 @@ Claude follows [`CLAUDE.md`](CLAUDE.md). It asks a few questions (your name, tim
 
 **You need:** Claude with artifacts and scheduled tasks, plus the Gmail and/or Microsoft 365 connectors (Google Calendar works too).
 
+**Before you run it,** skim [`CLAUDE.md`](CLAUDE.md) and [`prompt/daily-brief.md`](prompt/daily-brief.md). They're short, and they're exactly what your Claude will follow with access to your mail.
+
 ## What you get
 
 - **One scheduled task**, every morning, in the cloud. Your computer can be off.
 - **Your inboxes, triaged.** Gmail and Outlook, each sorted into *Needs you*, *Worth a look*, *Worth reading* (two newsletters at most) and counts of what was skipped.
 - **Your calls** for today and the rest of the week: who's joining, and which ones clash.
 - **One page** that updates itself. Tap *Need you* for everything waiting on you, with a button that opens each email. Fold an inbox you don't need right now. Tap the clock to see the view.
-- **Read-only.** It never sends, archives or changes anything in your mail or calendar. The only thing it writes is the page's own data.
+- **Read-only.** It never sends, archives or changes anything in your mail or calendar, and it ignores instructions hidden in emails. The only thing it writes is the page's own data, which only you can read.
 
 ## What's in here
 

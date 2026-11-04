@@ -1009,7 +1009,8 @@ const ICONS={
 };
 const svg=k=>`<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${ICONS[k]}</svg>`;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const safeUrl=u=>/^https:\/\//i.test(u||'')?u:'';
+const MAIL_HOSTS=/^(mail\.google\.com|outlook\.office\.com|outlook\.office365\.com|outlook\.live\.com)$/i;   // Open buttons only ever open your own mail
+const safeUrl=u=>{try{const x=new URL(u);return x.protocol==='https:'&&MAIL_HOSTS.test(x.hostname)?u:''}catch(e){return ''}};
 
 const TZ=(window.BRIEF_CONFIG&&BRIEF_CONFIG.timeZone)||'Europe/Amsterdam';
 const IB=Object.assign({work:{label:'Work',account:'Outlook'},personal:{label:'Personal',account:'Gmail'}},(window.BRIEF_CONFIG&&BRIEF_CONFIG.inboxes)||{});   // null hides an inbox

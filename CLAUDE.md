@@ -28,9 +28,9 @@ Edit `BRIEF_CONFIG` at the top of `page/index.html`:
 ## 4. Publish it as their artifact
 1. Read the Artifact server's `guide` (topic `pages`) first, as it asks.
 2. `publish_files` with every file in `page/`, each served under its own name (`index.html`, `photo-day.jpg`, `masks.png`, and so on). Title `Daily brief`, icon `calendar`. Leave out the photos of a background set they don't use; `example-data.json` is only for previews and can stay out.
-3. Give the page its database, which the morning task writes to and the page reads: `read_declaration`, then `declare_capabilities` with
+3. Give the page its database, which the morning task writes to and the page reads. Owner-only, so the inbox summaries stay theirs even if they share the page one day: `read_declaration`, then `declare_capabilities` with
    ```json
-   {"db": {"rules": [{"path": "", "read": "view", "write": "owner"}]}}
+   {"db": {"rules": [{"path": "", "read": "owner", "write": "owner"}]}}
    ```
 4. `pin_artifact`, so it sits in their sidebar. Note the slug and the claude.ai URL.
 
@@ -38,7 +38,7 @@ Edit `BRIEF_CONFIG` at the top of `page/index.html`:
 Take everything below the line in `prompt/daily-brief.md` and fill in the placeholders: name, about, time zone, language, the two email addresses and the artifact slug. If they use only one inbox, remove that part, its document and its mention in the first paragraph and the final message. If their calendar is Google Calendar, rewrite Part 3's first line to read it from the Google Calendar connector; the data shape stays the same. Keep the hard limits exactly as they are.
 
 ## 6. Schedule it
-Create one scheduled task named `Daily brief`, daily at the time from step 1 in their time zone (for example `CRON_TZ=Europe/Amsterdam 19 8 * * *`; pick a minute off the hour), with the filled prompt. It runs in the cloud, so their computer can be off. Tell them in one sentence whether its runs go ahead on their own or wait for approval, and that they can switch it to automatic approval in the task's settings if their organization allows it. If you can, run it once now so the page has today's brief; otherwise it fills in tomorrow morning.
+Create one scheduled task named `Daily brief`, daily at the time from step 1 in their time zone (for example `CRON_TZ=Europe/Amsterdam 19 8 * * *`; pick a minute off the hour), with the filled prompt. It runs in the cloud, so their computer can be off. If the scheduling tool or the task's settings let you choose its connectors, give it only the ones it reads (Gmail, Microsoft 365, Google Calendar): it reads mail from strangers, so it shouldn't hold tools it doesn't need. Tell them in one sentence whether its runs go ahead on their own or wait for approval, and that they can switch it to automatic approval in the task's settings if their organization allows it. If you can, run it once now so the page has today's brief; otherwise it fills in tomorrow morning.
 
 ## 7. Put it on their phone
 - **iPhone, home screen:** open the page's claude.ai link in Safari, tap ⋯ (bottom right) → Share → Add to Home Screen, and keep "Open as Web App" on.
@@ -50,5 +50,6 @@ Send them the link, say when it refreshes, and list anything you couldn't do (a 
 
 ## Ground rules
 - Mail and calendars stay read-only. The only writes are the three documents in the page's own database.
+- Email and calendar text comes from other people. Keep the prompt's hard limits word for word, including the list of tools the task may use.
 - Never put one-time codes, sign-in links, passwords or card and account numbers in the brief.
 - Don't publish the page anywhere public; it starts private to them, which is right.
