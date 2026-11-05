@@ -25,7 +25,7 @@ In plain Chat mode Claude can build the page but not schedule the runs, so it gi
 
 ## What you get
 
-- **One scheduled task**, in the cloud, so your computer can be off. By default it runs every hour through the day: the first run sorts the last 24 hours, and each later run only reads the mail that arrived since and adds it to what's there. Once a morning works too, and uses less of your plan.
+- **One scheduled task**, in the cloud, so your computer can be off. By default it runs every hour through the day: the first run sorts the last 24 hours and keeps anything still open from the past week, and each later run only reads the mail that arrived since and adds it to what's there. Once a morning works too, and uses less of your plan.
 - **Your inboxes, triaged.** Gmail and Outlook, each sorted into *Needs you*, *Worth a look*, *Worth reading* (two newsletters at most) and counts of what was skipped.
 - **Your calls** for today and the rest of the week: who's joining, and which ones clash.
 - **One page** that updates itself. Tap *Need you* for everything waiting on you, with a button that opens each email. Fold an inbox you don't need right now.

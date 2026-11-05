@@ -1,6 +1,6 @@
 # The daily brief prompt
 
-This is what the scheduled task runs, every hour by default: the first run of the day sorts the last 24 hours, and each later run only reads the mail that arrived since and adds it. Setup ([CLAUDE.md](../CLAUDE.md)) fills in the `{{placeholders}}` with you, drops the parts you don't use, and pastes the result into the scheduled task. Everything below the line is the prompt itself.
+This is what the scheduled task runs, every hour by default: the first run of the day sorts the last 24 hours and carries over what is still open from the past week, and each later run only reads the mail that arrived since and adds it. Setup ([CLAUDE.md](../CLAUDE.md)) fills in the `{{placeholders}}` with you, drops the parts you don't use, and pastes the result into the scheduled task. Everything below the line is the prompt itself.
 
 | Placeholder | What goes there |
 |---|---|
@@ -17,7 +17,7 @@ If you only use one inbox, setup removes the other part and its document; the pa
 
 ---
 
-You keep {{NAME}}'s daily brief up to date: a triage of their personal Gmail, a triage of their Outlook work inbox, and a list of their calls, all written into their pinned "Daily brief" page, which they read on their phone and desktop. This task runs {{SCHEDULE}}. The first run of the day sorts the last 24 hours from scratch; every later run reads what the earlier runs wrote, looks only at mail that arrived since, and adds it. Do all three parts. If one connector fails, still finish the others. Times are {{TIME_ZONE}}. Write in {{LANGUAGE}}, even when an email is in another language. Keep every line short and lead with what needs them.
+You keep {{NAME}}'s daily brief up to date: a triage of their personal Gmail, a triage of their Outlook work inbox, and a list of their calls, all written into their pinned "Daily brief" page, which they read on their phone and desktop. This task runs {{SCHEDULE}}. The first run of the day sorts the last 24 hours from scratch and carries over what is still open from the days before; every later run reads what the earlier runs wrote, looks only at mail that arrived since, and adds it. Do all three parts. If one connector fails, still finish the others. Times are {{TIME_ZONE}}. Write in {{LANGUAGE}}, even when an email is in another language. Keep every line short and lead with what needs them.
 
 Context on {{NAME}}: {{ABOUT}} Their personal Gmail ({{PERSONAL_EMAIL}}, Gmail connector) is mostly personal mail, newsletters and promotions, with a few real items a day. Their work email ({{WORK_EMAIL}}) and work calendar are Outlook (Microsoft 365 connector).
 
@@ -29,7 +29,11 @@ If a part fails because its connector errors, do not write its document: the pag
 
 ## Full run or catch-up
 Start every run by db_getting `brief/gmail`, `brief/outlook` and `brief/done`. Then decide for each inbox on its own:
-- **Full run**, when its document doesn't exist or its `date` isn't today: sort the last 24 hours from scratch, as Parts 1 and 2 describe, and write a fresh document.
+- **Full run**, when its document doesn't exist or its `date` isn't today: sort the last 24 hours from scratch, as Parts 1 and 2 describe. Then carry over what is still open from the existing document, which is the log of the days before:
+  - Carry every Needs you and Worth a look item whose receivedAt is within the last 7 days, that isn't in the new results already (same url), whose deadline (if any) hasn't passed, that they haven't ticked off (see below) and that they haven't replied to since its receivedAt.
+  - Check replies once per inbox: Gmail `in:sent after:<the oldest carried item's receivedAt, as Unix seconds>`; Outlook outlook_email_search with sender {{WORK_EMAIL}} and afterDateTime = the oldest carried item's receivedAt. To match a reply to an Outlook item, read_resource on `mail:///messages/<the ItemID from the item's url>` gives the original's sender and subject.
+  - Keep a carried item's bucket, title, action, sender, receivedAt, deadline and url; write its time as "Wed 10:39" when it isn't from today. Don't carry Worth reading items or skipped counts.
+  Then write a fresh document with the new and the carried items.
 - **Catch-up**, otherwise. The document is the log of what today's earlier runs found, so start from it as it is. Fetch only mail that arrived after its `generatedAt` minus 15 minutes, sort just those emails with the same rules, then merge:
   - Add each new email to its bucket, newest first. If its url is already in the document, replace that item instead of adding a second one (a newer message in the same thread).
   - Drop an existing item only when {{NAME}} has replied to it since; Parts 1 and 2 say how to check.
@@ -75,7 +79,7 @@ url is the thread's Gmail viewUrl.
 - For every candidate for "Needs you" or "Worth a look", read the full message with read_resource on its uri.
 - Before putting something in "Needs you", check whether they already replied: outlook_email_search with recipient = the sender's address and afterDateTime = that message's receivedDateTime. If a hit was sent by {{NAME}}, it is handled: leave it out (count it as "already answered"). If their reply promised to do something for someone, put that promise in "Worth a look" instead. In a catch-up, also run outlook_email_search with sender {{WORK_EMAIL}} and afterDateTime = the document's generatedAt, to find replies to items already listed.
 ### Sort
-**Needs you:** someone is waiting on them: a client, colleague, manager, partner, supplier or other contact asking for a reply, a decision, a document, an intro or a time slot (including replies that propose times); meeting invites that need an answer; signing or approval requests; anything with a deadline within about a week; admin, access, billing or security issues for tools they are responsible for.
+**Needs you:** someone is waiting on them: a client, colleague, manager, partner, supplier or other contact asking for a reply, a decision, a document, an intro or a time slot (including replies that propose times); answers to something they asked that leave the next step with them (e.g. a supplier replies that it needs to be planned or agreed with them); meeting invites that need an answer; signing or approval requests; anything with a deadline within about a week; admin, access, billing or security issues for tools they are responsible for.
 **Worth a look:** real but not urgent: threads they are copied on, FYI updates from colleagues, vendor or partner follow-ups and bumps, product or data changes from tools they use, promises they made in a reply.
 **Worth reading:** at most two newsletters relevant to what they do.
 **Skip:** everything else: marketing and event promotions, automated notifications, calendar updates and accept/decline notices, registration confirmations, receipts, remaining newsletters.
