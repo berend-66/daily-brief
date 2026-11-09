@@ -21,6 +21,8 @@ Claude follows [`CLAUDE.md`](CLAUDE.md). It asks a few questions (your name, tim
 
 In plain Chat mode Claude can build the page but not schedule the runs, so it gives you the prompt and the three clicks to schedule it yourself.
 
+**Using ChatGPT?** The brief runs there too, as a scheduled task, and the living page can be tried on a ChatGPT Site. See [`docs/chatgpt.md`](docs/chatgpt.md).
+
 **Before you run it,** skim [`CLAUDE.md`](CLAUDE.md) and [`prompt/daily-brief.md`](prompt/daily-brief.md). They're short, and they're exactly what your Claude will follow with access to your mail.
 
 ## What you get
@@ -51,6 +53,7 @@ The task reads email from strangers, so it's built not to be talked into anythin
 | [`page/`](page/) | The page: `index.html` (settings at the top), its photos and the masks behind the living background |
 | [`prompt/daily-brief.md`](prompt/daily-brief.md) | The prompt the scheduled task runs, as a fill-in template |
 | [`CLAUDE.md`](CLAUDE.md) | The setup guide Claude follows |
+| [`docs/chatgpt.md`](docs/chatgpt.md) | How the brief maps onto ChatGPT, with a ChatGPT version of the prompt in [`prompt/daily-brief-chatgpt.md`](prompt/daily-brief-chatgpt.md) |
 | [`background/`](background/) | How the living background works, how to bring your own photo to life, and the scripts that built the masks |
 
 ## Try it first
