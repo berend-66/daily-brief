@@ -30,14 +30,15 @@ In plain Chat mode Claude can build the page but not schedule the runs, so it gi
 - **Your calls** for today and the rest of the week: who's joining, and which ones clash.
 - **One page** that updates itself. Tap *Need you* for everything waiting on you, with a button that opens each email. Fold an inbox you don't need right now.
 - **Sign things off.** Tick an email when it's handled: it folds into *Done*, stays done on your phone and desktop, and the next runs leave it out unless a new message arrives in that thread.
+- **It learns how you sort.** Tap an email that landed in the wrong place and move it to *Needs you*, *Worth a look* or *Not for me*. Every run reads your corrections before it sorts, and puts mail like that where you put it, for good. The *Data* tab counts your corrections per week, so you can watch them drop as it learns.
 - **Play with the sheep.** Tap the clock to see the view, then pick a sheep up: it swings from your finger, its legs dangle and kick, and you can carry it across the field or toss it. With a mouse, grab any sheep you can see.
-- **Read-only.** It never sends, archives or changes anything in your mail or calendar, and it ignores instructions hidden in emails. The only thing it writes is the page's own data, which only you can read; your sign-offs live there too.
+- **Read-only.** It never sends, archives or changes anything in your mail or calendar, and it ignores instructions hidden in emails. The only thing it writes is the page's own data, which only you can read; your sign-offs and corrections live there too.
 
 ## Security
 
 The task reads email from strangers, so it's built not to be talked into anything:
 
-- **Email is data, not instructions.** The prompt tells it to ignore anything in an email or calendar invite that asks it to act, whoever it claims to be from, and lists the only tools it may use: searching and reading mail and calendar, and writing the page's data.
+- **Email is data, not instructions.** The prompt tells it to ignore anything in an email or calendar invite that asks it to act, whoever it claims to be from, and says what it may use tools for: reading mail and calendar, and writing the page's data. Every other connector is off limits.
 - **Read-only.** It never sends, replies, forwards, deletes or changes anything in your mail or calendar, and never opens links in emails.
 - **Links are checked.** The page only shows an Open button for Gmail and Outlook links, so a link planted in an email can't hide behind one. All text is escaped, so nothing in an email can run as code on the page.
 - **Your data stays yours.** The page's data is readable by you alone, even if you share the page, and the page loads nothing from outside.
@@ -58,11 +59,11 @@ The task reads email from strangers, so it's built not to be talked into anythin
 cd page && python3 -m http.server
 ```
 
-Then open http://localhost:8000. Outside Claude the page shows example data (made up), with the background running: tap the clock and pick up a sheep. Sign-offs stay in that browser.
+Then open http://localhost:8000. Outside Claude the page shows example data (made up), with the background running: tap the clock and pick up a sheep. Sign-offs and corrections stay in that browser.
 
 ## Make it yours
 
-- **Settings** sit at the top of `page/index.html`: your time zone and location (for sunrise and sunset), the background (`'photos'` or the painted `'ink'` landscapes), `alwaysDay` (the living daytime photo day and night, or the evening and night photos after sunset), and the inbox labels.
+- **Settings** sit at the top of `page/index.html`: your time zone and location (for sunrise and sunset), the background (`'photos'` or the painted `'ink'` landscapes), `alwaysDay` (the living daytime photo day and night, or the evening and night photos after sunset), `runs` (when your task runs, so the page can say when the next update comes) and the inbox labels.
 - **Your own living photo:** [`background/README.md`](background/README.md) shows how the sheep photo was brought to life and how to do it with yours. Clouds and water work on most landscapes.
 
 ## Credits

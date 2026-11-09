@@ -14,6 +14,8 @@
                'ink'     painted landscapes, no photos and no animation
    inboxes     how each inbox is labelled; set one to null to hide it (Outlook → brief/outlook,
                Gmail → brief/gmail, as the scheduled task writes them)
+   runs        when the scheduled task runs, so the page can show when the next update comes and
+               flag a missed one: '08:19-20:19' every hour in that window, or '08:19' once a morning
    alwaysDay   true: the living daytime photo shows day and night, so the sheep are always out;
                false: the evening and night photos take over around sunset (photos only)
    scene       optional: the numbers that belong to your own daytime photo, once you
@@ -24,6 +26,7 @@ window.BRIEF_CONFIG = {
   longitude: 4.90,
   background: 'photos',
   alwaysDay: true,
+  runs: '08:19-20:19',
   inboxes: {
     work:     { label: 'Work',     account: 'Outlook' },
     personal: { label: 'Personal', account: 'Gmail' }
@@ -191,6 +194,12 @@ html.sheep-grab,html.sheep-grab *{cursor:grabbing!important}
 
 /* Hero: date, live clock, greeting */
 .hero-h{text-shadow:var(--hero-shadow);margin-bottom:22px}
+/* when the brief last refreshed, and when it refreshes next; amber when a run was missed */
+.upd{display:inline-flex;align-items:center;gap:7px;margin-top:12px;padding:6px 12px 6px 10px;border-radius:999px;font:600 13.5px/1.2 var(--font);letter-spacing:-.01em;color:var(--label);text-shadow:none;
+  background:linear-gradient(150deg,var(--g-a),var(--g-b));-webkit-backdrop-filter:var(--g-blur);backdrop-filter:var(--g-blur);box-shadow:inset 0 0 0 1px var(--g-edge),inset 0 1px 0 var(--g-hi)}
+.upd .dot{width:7px;height:7px;border-radius:50%;background:var(--live);flex:none}
+.upd .nx{color:var(--label2);font-weight:500}
+.upd.stale .dot{background:#FFB547;box-shadow:0 0 0 3px rgba(255,181,71,.25)}
 .eyebrow{font-size:13px;font-weight:600;letter-spacing:.02em;text-transform:uppercase;color:var(--label2)}
 .clock{display:block;width:max-content;font:600 76px/1 var(--font-round);letter-spacing:-.035em;font-variant-numeric:tabular-nums;margin:6px 0 10px;text-shadow:none;
   background:linear-gradient(180deg,var(--clock-a),var(--clock-b));-webkit-background-clip:text;background-clip:text;color:transparent;
@@ -367,6 +376,40 @@ h1{font:700 26px/1.2 var(--font-display);letter-spacing:-.024em;margin:0 0 3px}
 .row.done .r-sub,.row.done .r-meta,.row.done .deadline{opacity:.55;transition:opacity .3s var(--ease)}
 .row.done .btn{opacity:.75}
 .row.fresh{animation:rowin .42s var(--ease) backwards}
+/* Teach the triage: tap an email to move it where it belongs; the task learns from your moves */
+.row.mv>div:nth-child(2){cursor:pointer;-webkit-tap-highlight-color:transparent}
+.fb{grid-column:2/-1;display:grid;grid-template-rows:0fr;margin-top:-12px;transition:grid-template-rows .3s var(--ease),margin-top .3s var(--ease)}
+.fb>div{overflow:hidden;min-height:0}
+.row.fb-open .fb{grid-template-rows:1fr;margin-top:-4px}
+.fb-h{font-size:12.5px;color:var(--label3);margin:0 0 8px}
+.seg{display:inline-flex;flex-wrap:wrap;gap:2px;padding:3px;border-radius:19px;background:var(--fill);margin-bottom:2px}
+.seg button{appearance:none;border:0;background:none;font:600 13px/1 var(--font);letter-spacing:-.01em;color:var(--label2);padding:8px 12px;border-radius:999px;cursor:pointer;white-space:nowrap;-webkit-tap-highlight-color:transparent;transition:background-color .2s var(--ease),color .2s var(--ease),transform .3s var(--spring)}
+.seg button:active{transform:scale(.94)}
+.seg button[aria-pressed="true"]{background:var(--label);color:var(--inv);cursor:default}
+.seg button:focus-visible{outline:2px solid var(--label);outline-offset:1px}
+.mvd{font-weight:600;color:var(--label2)}
+@media (max-width:560px){.fb{grid-column:1/-1}.seg{display:flex;width:100%}.seg button{flex:1;padding:9px 6px}}
+/* Learning: how often you correct the brief, week by week (fewer is better) */
+.lc{padding:14px 16px 12px}
+.lc-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.lc-stats span{display:block;font-size:12px;color:var(--label3)}
+.lc-stats b{display:block;font:600 24px/1.15 var(--font-display);letter-spacing:-.02em;color:var(--label);margin-top:2px}
+.lc-h{font-size:13px;font-weight:600;color:var(--label2);margin-bottom:8px}
+.lc-chart{position:relative;display:grid;grid-template-columns:repeat(8,1fr)}
+.lc-col{position:relative;display:flex;flex-direction:column;align-items:center;outline:none;cursor:default;-webkit-tap-highlight-color:transparent}
+.lc-plot{position:relative;width:100%;height:96px;display:flex;align-items:flex-end;justify-content:center;border-bottom:1px solid var(--sep)}
+.lc-bar{width:min(24px,62%);border-radius:4px 4px 0 0;background:var(--label3);transition:filter .15s}
+.lc-col.now .lc-bar{background:var(--label)}
+.lc-col:hover .lc-bar,.lc-col:focus-visible .lc-bar,.lc-col.tip .lc-bar{filter:brightness(1.25)}
+.lc-col:focus-visible .lc-plot{outline:2px solid var(--label);outline-offset:2px;border-radius:4px}
+.lc-v{position:absolute;left:0;right:0;text-align:center;font-size:12px;font-weight:600;color:var(--label)}
+.lc-x{font-size:11px;color:var(--label3);margin-top:6px;white-space:nowrap}
+.lc-col.pre .lc-x{visibility:hidden}
+.lc-tip{position:absolute;bottom:calc(100% - 6px);left:50%;transform:translateX(-50%);z-index:3;pointer-events:none;white-space:nowrap;padding:7px 10px;border-radius:10px;
+  background:var(--label);color:var(--inv);font-size:12px;line-height:1.3;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.lc-tip b{display:block;font-size:14px}
+.lc-note{font-size:12.5px;color:var(--label3);margin-top:12px}
+.lc-empty{font-size:14px;color:var(--label2);padding:4px 0 2px}
 @keyframes rowin{from{opacity:0;transform:translateY(-4px)}}
 
 /* Wide screens: iPad/Mac pattern, tab bar floats at the top */
@@ -1328,7 +1371,7 @@ function applyScene(s){
 }
 applyScene(root.getAttribute('data-scene')||'dawn');
 
-const state={gmail:null,outlook:null,calendar:null,done:null,loaded:{gmail:false,outlook:false,calendar:false,done:false},error:null,timedOut:false,view:'overview'};
+const state={gmail:null,outlook:null,calendar:null,done:null,feedback:null,loaded:{gmail:false,outlook:false,calendar:false,done:false,feedback:false},error:null,timedOut:false,view:'overview'};
 let viewing=false;
 let sheetOpen=false,sheetFrom=null;
 const collapsed=(()=>{try{return JSON.parse(localStorage.getItem('brief-collapsed')||'{}')||{}}catch(e){return {}}})();
@@ -1376,7 +1419,23 @@ function hero(g,c,today,nowMin,now,nowHM){
     :esc(ready?'Your brief fills in after the morning refresh':'Loading your day…');
   return `<header class="hero-h"><div class="eyebrow">${esc(fLong.format(now))} · Week ${isoWeek(today)}</div>
     <time class="clock" role="button" tabindex="0" aria-pressed="${viewing}" title="${viewing?'Back to the brief':'Show the view'}" datetime="${esc(today)}T${esc(nowHM)}">${esc(nowHM)}</time>
-    <h1>${greet}</h1><p class="summary">${s}</p></header>`;
+    <h1>${greet}</h1><p class="summary">${s}</p>${updatedLine(now)}</header>`;
+}
+// when the task runs (BRIEF_CONFIG.runs): every hour from the first time to the last, or once a day
+const RUNS=(()=>{const m=/^\s*(\d{1,2}):(\d{2})(?:\s*-\s*(\d{1,2}):(\d{2}))?\s*$/.exec((window.BRIEF_CONFIG&&BRIEF_CONFIG.runs)||'08:19-20:19');
+  const a=m?(+m[1])*60+(+m[2]):8*60+19,b=m&&m[3]!=null?(+m[3])*60+(+m[4]):a;return {a,b,hourly:b>a}})();
+function updatedLine(now){
+  const t=Math.max(...[state.outlook,state.gmail,state.calendar].map(d=>Date.parse(d&&d.generatedAt)).filter(n=>!isNaN(n)));
+  if(!isFinite(t))return '';
+  const mins=Math.max(0,Math.round((now-t)/60000)),cur=toMin(hm(now));
+  const ago=mins<1?'just now':mins<60?`${mins} min ago`:mins<720?`${Math.floor(mins/60)} h${mins%60?` ${mins%60} min`:''} ago`
+    :`${ymd(new Date(t))===ymd(now)?'':fShort.format(new Date(t))+' '}${hm(new Date(t))}`;
+  const f=x=>`${String(Math.floor(x/60)).padStart(2,'0')}:${String(x%60).padStart(2,'0')}`;
+  const nx=cur<RUNS.a?RUNS.a:RUNS.hourly?RUNS.a+(Math.floor((cur-RUNS.a)/60)+1)*60:Infinity;
+  const next=nx<=RUNS.b?f(nx):`tomorrow ${f(RUNS.a)}`;
+  const stale=RUNS.hourly?mins>75&&cur>=RUNS.a+21&&cur<=RUNS.b+41   // an hour and more behind, while it should be running
+    :cur>=RUNS.a+41&&ymd(new Date(t))!==ymd(now);                    // this morning's run hasn't landed
+  return `<div class="upd${stale?' stale':''}"><i class="dot"></i><span>${stale?'Last update':'Updated'} ${esc(ago)}</span><span class="nx">· next ${next}</span></div>`;
 }
 
 function banner(g,c){
@@ -1477,8 +1536,37 @@ const itemKey=(src,x,doc)=>{const u=String(x.url||''),d=dupsOf(doc);return src[0
 function isDone(k,doc,x){const d=done[k];if(!d)return false;const a=Date.parse(d.at),r=x&&Date.parse(x.receivedAt);
   if(r)return a>=r;const g=Date.parse(doc&&doc.generatedAt);return !(g&&a&&a<g)}
 const items=doc=>doc?[...arr(doc.needYou),...arr(doc.worthLook),...arr(doc.worthReading)]:[];
-const openNeed=(doc,src)=>arr(doc&&doc.needYou).filter(x=>!isDone(itemKey(src,x,doc),doc,x)).length;
-const doneNeed=(doc,src)=>arr(doc&&doc.needYou).filter(x=>isDone(itemKey(src,x,doc),doc,x)).length;
+/* Corrections: tap an email to move it where it belongs. They're kept in brief/feedback (your page's own database),
+   and the task reads them on every run, so it sorts the next emails like them the way you would. */
+const fb={};
+try{const v=JSON.parse(localStorage.getItem('brief-feedback')||'{}');if(v&&typeof v==='object')Object.assign(fb,v)}catch(e){}
+// what you've taught it, kept for good: per sender, where you put their emails and how often (fb above keeps only the latest 100 in full)
+const learned={};
+try{const v=JSON.parse(localStorage.getItem('brief-learned')||'{}');if(v&&typeof v==='object')Object.assign(learned,v)}catch(e){}
+const perWeek={};                                               // corrections per week (keyed by the week's Monday), for the Learning chart
+try{const v=JSON.parse(localStorage.getItem('brief-perweek')||'{}');if(v&&typeof v==='object')Object.assign(perWeek,v)}catch(e){}
+const mondayOf=t=>{const d=new Date(t);d.setHours(12,0,0,0);d.setDate(d.getDate()-(d.getDay()+6)%7);return ymd(d)};
+const lKey=f=>'l'+hashKey(`${f.src}|${String(f.sender||'').trim().toLowerCase()}|${f.to}`);
+function learn(f,sign){                                         // +1 when you move an email, −1 when you take the move back
+  if(!f)return;
+  const w=mondayOf(f.at);perWeek[w]=(perWeek[w]||0)+sign;if(perWeek[w]<=0)delete perWeek[w];
+  if(!f.sender)return;const k=lKey(f),e=learned[k];
+  if(sign>0)learned[k]=Object.assign(e||{src:f.src,sender:f.sender,to:f.to,n:0,first:f.at},{n:(e?e.n:0)+1,last:f.at,example:f.title});
+  else if(e){e.n-=1;if(e.n<=0)delete learned[k]}
+}
+const BUCKETS=['needYou','worthLook','worthReading'];
+const where=(doc,x)=>BUCKETS.find(b=>arr(doc&&doc[b]).includes(x))||'worthLook';
+const movedTo=k=>{const f=fb[k];return f&&f.to!=='skip'&&BUCKETS.includes(f.to)?f.to:null};
+function sorted(doc,src){                                       // the task's buckets, with your moves applied
+  const out={needYou:[],worthLook:[],worthReading:[]};if(!doc)return out;
+  let moved=false;
+  BUCKETS.forEach(b=>arr(doc[b]).forEach(x=>{const to=movedTo(itemKey(src,x,doc))||b;if(to!==b)moved=true;out[to].push(x)}));
+  if(moved){const t=x=>Date.parse(x.receivedAt)||0;BUCKETS.forEach(b=>out[b].sort((p,q)=>t(q)-t(p)))}
+  return out;
+}
+let fbOpen=null;                                                // the email whose move panel is open
+const openNeed=(doc,src)=>sorted(doc,src).needYou.filter(x=>!isDone(itemKey(src,x,doc),doc,x)).length;
+const doneNeed=(doc,src)=>sorted(doc,src).needYou.filter(x=>isDone(itemKey(src,x,doc),doc,x)).length;
 
 function mailRow(x,kind,account,src,doc){
   const k=itemKey(src,x,doc),d=isDone(k,doc,x),t=esc(x.title||'');
@@ -1486,18 +1574,21 @@ function mailRow(x,kind,account,src,doc){
   const u=safeUrl(x.url);const sub=x.action||x.why;
   const tick=`<button class="tick${kind==='need'?' need':''}" data-k="${k}" data-s="${src}" aria-pressed="${d}" aria-label="${d?'Mark as not done':'Mark as done'}: ${t}">${svg('check')}</button>`;
   const open=u?`<a class="btn" href="${esc(u)}" target="_blank" rel="noopener noreferrer" aria-label="Open in ${esc(account||'mail')}: ${t}">Open${svg('arrow')}</a>`:'<span></span>';
+  const mv=movedTo(k),shown=mv||where(doc,x),op=k===fbOpen;
+  const panel=`<div class="fb"${op?'':' inert'}><div><div class="fb-h">In the wrong place? Move it, and the brief learns.</div><div class="seg" role="group" aria-label="Move this email">${
+    [['needYou','Needs you'],['worthLook','Worth a look'],['skip','Not for me']].map(([b,l])=>`<button type="button" data-mv="${b}" aria-pressed="${b===shown}">${l}</button>`).join('')}</div></div></div>`;
   if(d)return `<div class="row done" data-row="${k}">${tick}<div><div class="r-title">${t}</div>${(meta||x.source)?`<div class="r-meta">${x.source?`<span>${esc(x.source)}</span>`:''}${meta?`<span>${meta}</span>`:''}</div>`:''}</div>${open}</div>`;
-  return `<div class="row" data-row="${k}">${tick}<div>
+  return `<div class="row mv${op?' fb-open':''}" data-row="${k}" data-s="${src}">${tick}<div>
     <div class="r-title">${t}</div>${sub?`<div class="r-sub">${esc(sub)}</div>`:''}
     ${x.deadline?`<div class="deadline">${svg('clock')}<span>${esc(x.deadline)}</span></div>`:''}
-    ${(meta||x.source)?`<div class="r-meta">${x.source?`<span class="badge">${esc(x.source)}</span>`:''}${meta?`<span>${meta}</span>`:''}</div>`:''}</div>
-    ${open}</div>`;
+    ${(meta||x.source||mv)?`<div class="r-meta">${x.source?`<span class="badge">${esc(x.source)}</span>`:''}${meta?`<span>${meta}</span>`:''}${mv?'<span class="mvd">Moved by you</span>':''}</div>`:''}</div>
+    ${open}${panel}</div>`;
 }
 /* One block per inbox: Work (Outlook) and Personal (Gmail) */
 function inboxBlock(doc,loaded,title,account,emptyMsg,key,src){
   const closed=!!collapsed[key];
   const split=list=>{const o=[],d=[];arr(list).forEach(x=>(isDone(itemKey(src,x,doc),doc,x)?d:o).push(x));return [o,d]};
-  const [n,nd]=split(doc&&doc.needYou),[w,wd]=split(doc&&doc.worthLook),[r,rd]=split(doc&&doc.worthReading);
+  const B3=sorted(doc,src),[n,nd]=split(B3.needYou),[w,wd]=split(B3.worthLook),[r,rd]=split(B3.worthReading);
   const nDone=nd.length+wd.length+rd.length;
   const counts=()=>{
     if(!loaded)return '';if(!doc)return 'nothing yet';
@@ -1528,7 +1619,7 @@ function render(){
   const now=new Date(),today=ymd(now),nowHM=hm(now),nowMin=toMin(nowHM);
   const sc=B.sceneAt(now);if(sc!==root.getAttribute('data-scene'))applyScene(sc);
   const g=state.gmail,c=state.calendar;
-  LD={gmail:ready&&state.loaded.gmail,outlook:ready&&state.loaded.outlook,calendar:ready&&state.loaded.calendar,done:ready&&state.loaded.done};
+  LD={gmail:ready&&state.loaded.gmail,outlook:ready&&state.loaded.outlook,calendar:ready&&state.loaded.calendar,done:ready&&state.loaded.done,feedback:ready&&state.loaded.feedback};
   const S={
     today:()=>todaySection(c,today,nowMin,nowHM),
     week:()=>weekSection(c,today),
@@ -1568,18 +1659,38 @@ function hlJSON(json){
   return esc(json).replace(/(&quot;(?:(?!&quot;).)*&quot;(\s*:)?|\b(?:true|false|null)\b|-?\d+(?:\.\d+)?)/g,m=>{
     const c=m.startsWith('&quot;')?(/:$/.test(m)?'k':'s'):'n';return `<span class="${c}">${m}</span>`;});
 }
+/* Learning: corrections per week over the last eight weeks; the bars should shrink as the brief learns */
+function learningCard(){
+  const now=new Date(),thisWk=mondayOf(now),weeks=[];
+  for(let i=7;i>=0;i--){const d=new Date(now);d.setDate(d.getDate()-7*i);weeks.push(mondayOf(d))}
+  const total=Object.values(perWeek).reduce((a,v)=>a+v,0),first=Object.keys(perWeek).sort()[0];
+  const senders=new Set(Object.values(learned).map(e=>e.src+'|'+String(e.sender).toLowerCase())).size;
+  const stats=`<div class="lc-stats"><div><span>This week</span><b>${perWeek[thisWk]||0}</b></div><div><span>All time</span><b>${total}</b></div><div><span>Senders learned</span><b>${senders}</b></div></div>`;
+  if(!total)return `<div class="card lc">${stats}<div class="lc-empty">Move an email to where it belongs and this starts counting. Fewer corrections each week means the brief is learning.</div></div>`;
+  const max=Math.max(1,...weeks.map(w=>perWeek[w]||0));
+  const label=w=>{const d=new Date(w+'T12:00:00');return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'})};
+  const cols=weeks.map(w=>{
+    const n=perWeek[w]||0,h=Math.round(96*n/max),pre=first&&w<first,cur=w===thisWk;
+    const what=`${n} correction${n===1?'':'s'}`,when=cur?'This week':`Week of ${label(w)}`;
+    return `<div class="lc-col${cur?' now':''}${pre?' pre':''}" role="listitem" tabindex="${pre?-1:0}" aria-label="${when}: ${what}" data-n="${what}" data-w="${when}">
+      <div class="lc-plot">${n?`<div class="lc-bar" style="height:${h}px"></div>`:''}${cur&&n?`<span class="lc-v" style="bottom:${h+4}px">${n}</span>`:''}</div>
+      <span class="lc-x">${cur?'Now':label(w)}</span></div>`;
+  }).join('');
+  return `<div class="card lc">${stats}<div class="lc-h">Corrections per week</div><div class="lc-chart" role="list" aria-label="Corrections per week, last eight weeks">${cols}</div>
+    <div class="lc-note">Fewer corrections each week means the brief is learning. Each one is in brief/feedback below.</div></div>`;
+}
 function dataView(){
   const shortUrl=(k,v)=>typeof v==='string'&&/^https?:/.test(v)&&v.length>64?v.slice(0,60)+'…':v;
-  const cards=['outlook','gmail','calendar','done'].map(k=>{
+  const cards=['outlook','gmail','calendar','done','feedback'].map(k=>{
     const d=state[k];const loaded=LD[k];
-    const written=d&&k==='done'&&d.updatedAt?stamp({generatedAt:d.updatedAt},'Written'):d?stamp(d,'Written'):'';
+    const written=d&&(k==='done'||k==='feedback')&&d.updatedAt?stamp({generatedAt:d.updatedAt},'Written'):d?stamp(d,'Written'):'';
     const head=`<div class="dv-h"><code>brief/${k}</code>${written}${d?`<button class="btn dv-copy" data-k="${k}">Copy</button>`:''}</div>`;
     const body=!loaded?'<div class="dv-empty"><span class="skel w80"></span><span class="skel w60"></span></div>'
       :d?`<pre class="dv-json">${hlJSON(JSON.stringify(d,shortUrl,2))}</pre>`
-      :`<div class="dv-empty">${k==='done'?'Empty until you tick something off.':'Empty until the next morning refresh writes it.'}</div>`;
+      :`<div class="dv-empty">${k==='done'?'Empty until you tick something off.':k==='feedback'?'Empty until you move an email.':'Empty until the next morning refresh writes it.'}</div>`;
     return `<div class="card">${head}${body}</div>`;
   }).join('');
-  return sec('Database',`<span class="stamp">collection brief · 4 entries</span>`,`<div class="dv">${cards}</div>`);
+  return sec('Learning','<span class="stamp">from the emails you move</span>',learningCard())+sec('Database',`<span class="stamp">collection brief · 5 entries</span>`,`<div class="dv">${cards}</div>`);
 }
 /* Needs-you sheet: everything waiting on you, from both inboxes, with a way into each email */
 const sheet=document.getElementById('sheet'),sheetB=document.getElementById('sheet-b'),sheetT=document.getElementById('sheet-t');
@@ -1589,7 +1700,7 @@ function fillSheet(){
   sheetT.innerHTML=`Needs you<small>${total}</small>`;
   let h='';
   src.forEach(([label,acct,doc,loaded,s])=>{
-    const all=doc?arr(doc.needYou):[],n=all.filter(x=>!isDone(itemKey(s,x,doc),doc,x)),d=all.filter(x=>isDone(itemKey(s,x,doc),doc,x));
+    const all=doc?sorted(doc,s).needYou:[],n=all.filter(x=>!isDone(itemKey(s,x,doc),doc,x)),d=all.filter(x=>isDone(itemKey(s,x,doc),doc,x));
     h+=`<div class="grp">${esc(label)}<span class="acct">${esc(acct)}</span></div>`;
     h+=!loaded?'<div class="row"><span class="tile ph"></span><div><span class="skel w80"></span><span class="skel w40"></span></div><span></span></div>'
       :(n.length?n.map(x=>mailRow(x,'need',acct,s,doc)).join('')
@@ -1639,7 +1750,8 @@ function toggleDone(b){
   const x=items(doc).find(i=>itemKey(src,i,doc)===k);if(!x)return;
   const on=!isDone(k,doc,x);
   if(on){const u=safeUrl(x.url);done[k]=Object.assign({at:new Date().toISOString(),title:String(x.title||'').slice(0,140)},u?{url:u}:{})}
-  else delete done[k];
+  else{delete done[k];if(fb[k]&&fb[k].to==='skip'){learn(fb[k],-1);delete fb[k];saveFb()}}   // un-ticking a "Not for me" takes the correction back too
+  if(on&&fbOpen===k)fbOpen=null;
   saveDone();
   b.setAttribute('aria-pressed',String(on));b.setAttribute('aria-label',(on?'Mark as not done':'Mark as done')+': '+(x.title||''));
   const row=b.closest('.row');if(row)row.classList.toggle('done',on);
@@ -1648,8 +1760,52 @@ function toggleDone(b){
   hold();
   pend[k]=setTimeout(()=>{delete pend[k];fold(row).then(()=>{freshKey=k;release()})},on?650:200);
 }
+/* Move an email: the choice lights up, the row folds away and lands in its new group (or under Done, for Not for me) */
+let fbRef=null,fbSaving=false,fbAgain=false;
+async function saveFb(){
+  Object.keys(fb).sort((a,b)=>Date.parse(fb[b].at)-Date.parse(fb[a].at)).slice(100).forEach(k=>delete fb[k]);   // the 100 latest are what the task learns from
+  try{localStorage.setItem('brief-feedback',JSON.stringify(fb));localStorage.setItem('brief-learned',JSON.stringify(learned));localStorage.setItem('brief-perweek',JSON.stringify(perWeek))}catch(e){}
+  if(!fbRef)return;
+  if(fbSaving){fbAgain=true;return}
+  fbSaving=true;
+  try{do{fbAgain=false;await fbRef.set({updatedAt:new Date().toISOString(),learned:JSON.parse(JSON.stringify(learned)),perWeek:JSON.parse(JSON.stringify(perWeek)),items:JSON.parse(JSON.stringify(fb))})}while(fbAgain)}
+  catch(e){try{console.warn('Correction not saved:',e&&e.code)}catch(_){}}
+  finally{fbSaving=false}
+}
+function toggleFb(row,open){
+  const k=row.dataset.row;open=open==null?fbOpen!==k:open;
+  document.querySelectorAll('.row.fb-open').forEach(r=>{if(r!==row){r.classList.remove('fb-open');const p=r.querySelector('.fb');if(p)p.inert=true}});
+  row.classList.toggle('fb-open',open);const p=row.querySelector('.fb');if(p)p.inert=!open;
+  fbOpen=open?k:null;
+  if(open&&p)setTimeout(()=>{                                   // keep the panel clear of the tab bar
+    const bar=document.querySelector('nav'),lim=(bar?bar.getBoundingClientRect().top:innerHeight)-14,d=p.getBoundingClientRect().bottom-lim;
+    if(d>0&&!row.closest('.sheet'))window.scrollBy({top:d,behavior:'smooth'});
+  },320);
+}
+function moveTo(btn){
+  const row=btn.closest('.row');if(!row)return;
+  const k=row.dataset.row,src=row.dataset.s,doc=state[src];
+  const x=items(doc).find(i=>itemKey(src,i,doc)===k);if(!x)return;
+  const from=where(doc,x),to=btn.dataset.mv,shown=movedTo(k)||from,u=safeUrl(x.url),now=new Date().toISOString();
+  if(to===shown){toggleFb(row,false);return}
+  if(fb[k])learn(fb[k],-1);                                     // a change of mind replaces the earlier lesson
+  if(to===from)delete fb[k];                                   // back where the task put it: nothing to learn
+  else{fb[k]=Object.assign({at:now,src,from,to,title:String(x.title||'').slice(0,140),sender:String(x.sender||x.source||'').slice(0,80)},u?{url:u}:{});learn(fb[k],1)}
+  if(to==='skip'&&!isDone(k,doc,x)){done[k]=Object.assign({at:now,title:String(x.title||'').slice(0,140)},u?{url:u}:{});saveDone()}
+  saveFb();fbOpen=null;
+  row.querySelectorAll('.seg button').forEach(b=>b.setAttribute('aria-pressed',String(b===btn)));
+  if(navigator.vibrate)try{navigator.vibrate(10)}catch(e){}
+  hold();
+  setTimeout(()=>{fold(row).then(()=>{freshKey=k;release()})},280);
+}
+function rowClick(e){                                           // true when the tap was about moving an email
+  const sg=e.target.closest('.seg button');if(sg){moveTo(sg);return true}
+  const row=e.target.closest('.row.mv');if(!row||e.target.closest('a,button,.fb'))return !!(row&&e.target.closest('.fb'));
+  toggleFb(row);return true;
+}
 sheet.addEventListener('click',e=>{
   const tk=e.target.closest('.tick');if(tk){toggleDone(tk);return}
+  if(rowClick(e))return;
   if(e.target.closest('[data-close]'))closeSheet();
   const go=e.target.closest('[data-go]');if(go){closeSheet();setView(go.dataset.go)}
 });
@@ -1685,6 +1841,7 @@ sheet.addEventListener('keydown',e=>{
 })();
 main.addEventListener('click',e=>{
   const tk=e.target.closest('.tick');if(tk){toggleDone(tk);return}
+  if(rowClick(e))return;
   const o=e.target.closest('[data-open="needs"]');if(o){openSheet(o);return}
   const g=e.target.closest('[data-go]');if(g){setView(g.dataset.go);return}
   const t=e.target.closest('.ib-toggle');
@@ -1696,6 +1853,17 @@ function setViewing(v){viewing=v;document.body.classList.toggle('viewing',v);con
 main.addEventListener('click',e=>{if(e.target.closest('.clock'))setViewing(!viewing)});
 main.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.closest('.clock')){e.preventDefault();setViewing(!viewing)}});
 document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;if(sheetOpen){closeSheet();return}if(viewing)setViewing(false)});
+function lcTip(col){
+  main.querySelectorAll('.lc-tip').forEach(t=>t.remove());main.querySelectorAll('.lc-col.tip').forEach(c=>c.classList.remove('tip'));
+  if(!col||col.classList.contains('pre'))return;
+  const t=document.createElement('div');t.className='lc-tip';
+  const b=document.createElement('b');b.textContent=col.dataset.n;t.append(b,document.createTextNode(col.dataset.w));
+  col.classList.add('tip');col.querySelector('.lc-plot').appendChild(t);
+}
+main.addEventListener('pointerover',e=>{const c=e.target.closest('.lc-col');if(c&&e.pointerType==='mouse')lcTip(c)});
+main.addEventListener('pointerout',e=>{const c=e.target.closest('.lc-col');if(c&&e.pointerType==='mouse'&&!c.contains(e.relatedTarget))lcTip(null)});
+main.addEventListener('focusin',e=>{const c=e.target.closest('.lc-col');lcTip(c||null)});
+main.addEventListener('click',e=>{const c=e.target.closest('.lc-col');if(c){lcTip(c);return}if(main.querySelector('.lc-tip'))lcTip(null)});   // a tap shows that week; a tap elsewhere hides it
 main.addEventListener('click',async e=>{
   const b=e.target.closest('.dv-copy');if(!b)return;
   try{await navigator.clipboard.writeText(JSON.stringify(state[b.dataset.k],null,2));b.textContent='Copied'}
@@ -1759,7 +1927,7 @@ function maybeReady(){
       for(const k of ['gmail','outlook','calendar']){const d=JSON.parse(JSON.stringify(demo['brief/'+k]));d.date=today;d.generatedAt=stamp;
         if(d.days)d.days.forEach((x,i)=>{x.date=shift(x.date);const L=fLong.format(new Date(x.date+'T12:00:00Z'));x.label=i===0?'Today · '+L:L});
         state[k]=d;state.loaded[k]=true}
-      state.loaded.done=true;state.demo=true;maybeReady();render();return;   // sign-offs stay in this browser
+      state.loaded.done=state.loaded.feedback=true;state.demo=true;maybeReady();render();return;   // sign-offs and corrections stay in this browser
     }catch(e){}
     state.error='Sign in to claude.ai to see your brief.';maybeReady();render();return
   }
@@ -1782,6 +1950,33 @@ function maybeReady(){
     }
     state.loaded.done=true;render();
   },()=>{state.loaded.done=true;render()});
+  // your corrections, live across your devices; the task reads them on every run
+  fbRef=db.doc('brief/feedback');
+  fbRef.onSnapshot(s=>{
+    if(!fbSaving){
+      const d=s.exists?s.data():null,it=d&&d.items&&typeof d.items==='object'?d.items:{},str=v=>typeof v==='string'?v:'';
+      for(const k of Object.keys(fb))delete fb[k];
+      for(const [k,v] of Object.entries(it))if(v&&typeof v.at==='string'&&typeof v.to==='string')
+        fb[k]=Object.assign({at:v.at,src:str(v.src),from:str(v.from),to:v.to,title:str(v.title),sender:str(v.sender)},typeof v.url==='string'?{url:v.url}:{});
+      const lr=d&&d.learned&&typeof d.learned==='object'?d.learned:{};
+      for(const k of Object.keys(learned))delete learned[k];
+      for(const [k,v] of Object.entries(lr))if(v&&typeof v.to==='string'&&+v.n>0)
+        learned[k]={src:str(v.src),sender:str(v.sender),to:v.to,n:+v.n,first:str(v.first),last:str(v.last),example:str(v.example)};
+      const pw=d&&d.perWeek&&typeof d.perWeek==='object'?d.perWeek:{};
+      for(const k of Object.keys(perWeek))delete perWeek[k];
+      for(const [k,v] of Object.entries(pw))if(/^\d{4}-\d{2}-\d{2}$/.test(k)&&+v>0)perWeek[k]=+v;
+      // corrections in the log that the tallies miss (made before they existed, or from an older copy of the page) are counted in, once
+      const wk={},lk={};let healed=false;
+      for(const f of Object.values(fb)){const w=mondayOf(f.at);wk[w]=(wk[w]||0)+1;if(f.sender){const k=lKey(f);(lk[k]=lk[k]||[]).push(f)}}
+      for(const [w,n] of Object.entries(wk))if((perWeek[w]||0)<n){perWeek[w]=n;healed=true}
+      for(const [k,l] of Object.entries(lk)){const e=learned[k];if(!e||e.n<l.length){
+        l.sort((a,b)=>Date.parse(a.at)-Date.parse(b.at));const z=l[l.length-1];
+        learned[k]={src:z.src,sender:z.sender,to:z.to,n:l.length,first:e&&e.first||l[0].at,last:z.at,example:z.title};healed=true}}
+      state.feedback=d;try{localStorage.setItem('brief-feedback',JSON.stringify(fb));localStorage.setItem('brief-learned',JSON.stringify(learned));localStorage.setItem('brief-perweek',JSON.stringify(perWeek))}catch(e){}
+      if(healed)setTimeout(saveFb,0);
+    }
+    state.loaded.feedback=true;render();
+  },()=>{state.loaded.feedback=true;render()});
 })();
 </script>
 </body>
